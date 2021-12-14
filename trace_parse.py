@@ -48,10 +48,10 @@ def event_to_str(event, trace_root_fqn):
     string = ''
     if e_k == 'method_entry':
       # entry
-        string += "[ENTRY] " + event['return_type'] + type_list(event['parameter_types']) + ' '
+        string += "[ENTRY] " + event['return_type'] + type_list(event.get('parameter_types', [''])) + ' '
     elif e_k == 'method_call':
        # oo
-        intermediate = "[CALL] " + event['called_class_name'] + ' ' + event['called_method_name'] + type_list(event['parameter_types']) + ' ' + event['return_type'] + ' '
+        intermediate = "[CALL] " + event['called_class_name'] + ' ' + event['called_method_name'] + type_list(event.get('parameter_types', [''])) + ' ' + event['return_type'] + ' '
         string += intermediate
         if intermediate in distinct_calls:
             distinct_calls[intermediate] += 1
