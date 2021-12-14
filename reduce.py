@@ -30,6 +30,5 @@ for filename in glob.iglob('pickles/*.pkl'):
 # "calls_per_trace": []
 # }
 
-print(final_dict)
-
-
+with open(f"reduced.pkl","wb") as f:
+    pickle.dump(final_dict,f)
