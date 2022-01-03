@@ -119,7 +119,9 @@ def trace_to_string(dump_name, trace, trace_root_fqn, recursive=True):
 string_traces = []
 for dump_name,traces in dumps.items():
     for trace in traces:
-        string_traces.append(trace_to_string(dump_name,trace, '') + '\n')
+        class_name = trace['class_name']
+        if "org.junit" not in class_name:
+            string_traces.append(trace_to_string(dump_name,trace, '') + '\n')
 # longest_string = max(string_traces, key=len)
 # print(longest_string)
 # print(f"API counter: {api_counter}")
