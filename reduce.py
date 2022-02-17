@@ -1,24 +1,27 @@
-import json
 import glob
-import os
 import gzip
-from pathlib import Path
+import json
+import os
 import pickle
 from collections import Counter
+from pathlib import Path
 
-final_dict = { "recursions_per_trace": Counter({}),
-"distinct_calls": Counter({}),
-"vocab_counter": Counter({}),
-"api_counter": Counter({}),
-"calls_per_trace": Counter({})
+final_dict = {
+    "recursions_per_trace": Counter({}),
+    "distinct_calls": Counter({}),
+    "vocab_counter": Counter({}),
+    "api_counter": Counter({}),
+    "calls_per_trace": Counter({}),
 }
 
-for filename in glob.iglob('pickles/*.pkl'):
-    with open(filename,'rb') as infile:
+for filename in glob.iglob("pickles/*.pkl"):
+    with open(filename, "rb") as infile:
         new_dict = pickle.load(infile)
         # print(new_dict)
         # print(new_dict["recursions_per_trace"])
-        final_dict["recursions_per_trace"].update(Counter(new_dict["recursions_per_trace"]))
+        final_dict["recursions_per_trace"].update(
+            Counter(new_dict["recursions_per_trace"])
+        )
         final_dict["distinct_calls"].update(Counter(new_dict["distinct_calls"]))
         final_dict["vocab_counter"].update(Counter(new_dict["vocab_counter"]))
         final_dict["api_counter"].update(Counter(new_dict["api_counter"]))
@@ -30,5 +33,5 @@ for filename in glob.iglob('pickles/*.pkl'):
 # "calls_per_trace": []
 # }
 
-with open(f"reduced.pkl","wb") as f:
-    pickle.dump(final_dict,f)
+with open(f"reduced.pkl", "wb") as f:
+    pickle.dump(final_dict, f)
