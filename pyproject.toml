@@ -12,6 +12,7 @@ jupyter = "^1.0.0"
 pylama = "^8.3.7"
 black = {extras = ["jupyter"], version = "^22.1.0"}
 isort = "^5.10.1"
+seaborn = "^0.11.2"
 
 [tool.poetry.dev-dependencies]
 
