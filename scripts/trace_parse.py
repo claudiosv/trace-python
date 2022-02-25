@@ -63,6 +63,8 @@ def get_core_methods(path):
 
             is_test_case = is_test_class and method_name.startswith("test")
             # Skip methods that don't belong to either category of interest.
+            if not is_test_case:
+                indexed_traces[data["index"]] = data
             if not is_test_case and not fanout:
                 # print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
                 continue
@@ -184,11 +186,7 @@ def trace_to_string(dump_name, trace, trace_root_fqn, string, recursive=True):
     # string += ''#trace["method_name"] + " -> "
     if not trace_root_fqn:
         trace_root_fqn = dump_name + "." + trace["method_name"]
-    if dump_name in indexed_traces:
-        indexed_traces[dump_name][trace["index"]] = trace
-    else:
-        indexed_traces[dump_name] = {}
-        indexed_traces[dump_name][trace["index"]] = trace
+    indexed_traces[trace["index"]] = trace
     for event in trace["method_events"]:
         if recursive and type(event) is int:
             # print('Trace indexed')
@@ -232,13 +230,13 @@ def trace_to_java_calls(dump_name, trace, trace_root_fqn, recursive=True):
         if recursive and type(event) is int:
             # print('Trace indexed')
             # pass
-            if dump_name in indexed_traces and event in indexed_traces[dump_name]:
+            if event in indexed_traces[dump_name]:
                 if trace_root_fqn in recursions_per_trace:
                     recursions_per_trace[trace_root_fqn] += 1
                 else:
                     recursions_per_trace[trace_root_fqn] = 1
                 java_calls += trace_to_java_calls(
-                    dump_name, indexed_traces[dump_name][event], trace_root_fqn
+                    dump_name, indexed_traces[event], trace_root_fqn
                 )
             else:
                 pass
@@ -253,11 +251,7 @@ def trace_to_java_calls(dump_name, trace, trace_root_fqn, recursive=True):
             #     vocab_counter[event_string] = 1
             if event["event_kind"] == "method_call":
                 java_calls += event_java_calls(event)
-    if dump_name in indexed_traces:
-        indexed_traces[dump_name][trace["index"]] = trace
-    else:
-        indexed_traces[dump_name] = {}
-        indexed_traces[dump_name][trace["index"]] = trace
+    indexed_traces[trace["index"]] = trace
     return java_calls
 
 
