@@ -8,6 +8,7 @@ import pickle
 from pathlib import Path
 import subprocess
 import pandas as pd
+from collections import Counter
 
 
 indexed_traces = {}  # dump: []
@@ -18,7 +19,7 @@ recursions_per_trace = {}  # dump_name.trace: \d
 api_counter = {}
 
 
-def get_core_methods(path):
+def get_core_methods(path,index_traces=True):
     """Generates a stream of core method events from a traced test suite."""
     # Use an expanding set of all method calls starting from a core/test method to track where we are in the call tree.
     # This set is initialized & updated with expected method events as soon as we enter a test case and should be empty
@@ -40,102 +41,79 @@ def get_core_methods(path):
         f"Opening dump of {('.'.join(suite_name) + '.java')} (size: {size}) from {path}:"
     )
     with gzip.open(path, "rt") as f:
-        for line in f:  # this is the number of traces
+        for line in f:
             line_ix += 1
             try:
                 data = json.loads(line.rstrip())
             except:
                 print("JSON error? line", line_ix, "of file", path)
                 continue
-            class_name = data["class_name"]
-            method_name = data["method_name"]
+            indexed_traces[data["index"]] = data
+    for key,data in indexed_traces.items():  # this is the number of traces
+        class_name = data["class_name"]
+        method_name = data["method_name"]
 
-            # Heuristically detect test case entries.
-            is_test_class = "test" in class_name.lower()
-            is_junit_class = "junit" in class_name.lower()
-            if is_junit_class:
-                print(
-                    f"jUnit class detected in: {path} method: {class_name}.{method_name}"
-                )
-            # if "assert" in method_name:
-            #     print(f"Assert in: {path} method: {class_name}.{method_name}")
-            #     print(filename.parents[1] / 'src' / 'main' / 'java' / (method['class_name'].replace('.','/').partition('$')[0] + '.java'))
+        # Heuristically detect test case entries.
+        is_test_class = "test" in class_name.lower()
+        is_junit_class = "junit" in class_name.lower()
+        if is_junit_class:
+            print(
+                f"jUnit class detected in: {path} method: {class_name}.{method_name}"
+            )
 
-            is_test_case = is_test_class and method_name.startswith("test")
-            # Skip methods that don't belong to either category of interest.
-            if not is_test_case:
-                indexed_traces[data["index"]] = data
-            if not is_test_case and not fanout:
-                # print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
-                continue
+        is_test_case = is_test_class and method_name.startswith("test")
 
-            # For all other cases, we now track the "fan-out" set of methods called to keep track of the call tree.
-            # We will track all the non-Java methods called from this method.
-            new_method_calls = [
-                event for event in data["method_events"] if isinstance(event, int)
-            ]
+        # Skip methods that don't belong to either category of interest.
+        if not is_test_case and not fanout:
+            # print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
+            continue
 
-            # First, check if we have just entered a new test case.
-            if not fanout:
-                # We must have arrived here from a test method.
-                # print("    Test detected:", method_name)
-                fanout = set(new_method_calls)
-            else:
-                if data["index"] not in fanout:
-                    raise ValueError("Index not found in fan-out!", data["index"])
-                # Remove the current call and add fan-out based on whether this is a test or core.
-                fanout.remove(data["index"])
-                fanout.update(new_method_calls)
+        # For all other cases, we now track the "fan-out" set of methods called to keep track of the call tree.
+        # We will track all the non-Java methods called from this method.
+        new_method_calls = [
+            event for event in data["method_events"] if isinstance(event, int)
+        ]
 
-            # Yield only non-test methods.
-            if (
-                not is_test_class
-            ):  # Focus on test classes to exclude calls from test cases to other test util functions.
-                yield data
+        # First, check if we have just entered a new test case.
+        if not fanout:
+            # We must have arrived here from a test method.
+            fanout = set(new_method_calls)
+        else:
+            if data["index"] not in fanout:
+                raise ValueError("Index not found in fan-out!", data["index"])
+            # Remove the current call and add fan-out based on whether this is a test or core.
+            fanout.remove(data["index"])
+            fanout.update(new_method_calls)
 
-
-def type_list_old(types):
-    value = " "
-    for t in types:
-        value += t + "|"
-    return value[:-1]
-
+        # Yield only non-test methods.
+        if (
+            not is_test_class
+        ):  # Focus on test classes to exclude calls from test cases to other test util functions.
+            # pass
+            yield data
 
 def type_list(types):
+    """Convert a list of type strings into one comma separated list"""
     value = ""
     for t in types:
         value += t + ","
     return value[:-1]
 
-def event_to_str(event, trace_root_fqn):
-    # print(event)
+def event_to_str(event, trace_root_fqn, method_class, method_name):
     e_k = event["event_kind"]
     string = ""
     if e_k == "method_entry":
-        pass
-        # entry
-        # string += (
-        #     "[ENTRY] "
-        #     + event["return_type"]
-        #     + type_list(event.get("parameter_types", [""]))
-        #     + " "
-        # )
+        string += (
+            "-> "
+            + method_class
+            + "."
+            + method_name + '('
+            + type_list(event.get("parameter_types", [""]))
+            + ") "
+            # + event["return_type"]
+        )
     elif e_k == "method_call":
-        # oo
-        called_class_name = event["called_class_name"]
-
-        # intermediate = (
-        #     "[CALL] "
-        #     + event["called_class_name"]
-        #     + " "
-        #     + event["called_method_name"]
-        #     + type_list(event.get("parameter_types", [""]))
-        #     + " "
-        #     + event["return_type"]
-        #     + " "
-        # )
-
-        intermediate = (
+        string += (
             "-> "
             + event["called_class_name"]
             + "."
@@ -143,168 +121,50 @@ def event_to_str(event, trace_root_fqn):
             + type_list(event.get("parameter_types", [""]))
             + ") "
             # + event["return_type"]
-            # + " "
         )
-        # if not called_class_name.startswith("java"):
-        string += intermediate
-        if intermediate in distinct_calls:
-            distinct_calls[intermediate] += 1
-        else:
-            distinct_calls[intermediate] = 1
-        if trace_root_fqn in calls_per_trace:
-            calls_per_trace[trace_root_fqn] += 1
-        else:
-            calls_per_trace[trace_root_fqn] = 1
-        if called_class_name.startswith("java"):
-            class_stems = event["called_class_name"].split(".")
-            class_stem = ".".join(class_stems[:3])
-            if class_stem in api_counter:
-                api_counter[class_stem] += 1
-            else:
-                api_counter[class_stem] = 1
     elif e_k == "method_exit":
-        pass
-        # oo
-        # if "return_type" in event:
-        # string += "[EXIT] " + event["return_type"]
-        # else:
-        # string += "[EXIT] "
-    else:
         pass
     return string
 
 
 def event_java_calls(event):
+    """Used for counting number of java.* calls"""
     called_class_name = event["called_class_name"]
-    if called_class_name.startswith("java"):
+    if called_class_name.startswith("java."):
         return 1
     else:
         return 0
 
 
-def trace_to_string(dump_name, trace, trace_root_fqn, string, recursive=True):
-    # string += ''#trace["method_name"] + " -> "
+def trace_to_string(dump_name, trace, trace_root_fqn, string):
     if not trace_root_fqn:
         trace_root_fqn = dump_name + "." + trace["method_name"]
-    indexed_traces[trace["index"]] = trace
     for event in trace["method_events"]:
-        if recursive and type(event) is int:
-            # print('Trace indexed')
-            # pass
-            if dump_name in indexed_traces and event in indexed_traces[dump_name]:
-                if trace_root_fqn in recursions_per_trace:
-                    recursions_per_trace[trace_root_fqn] += 1
-                else:
-                    recursions_per_trace[trace_root_fqn] = 1
-                string += (
-                    trace_to_string(
-                        dump_name,
-                        indexed_traces[dump_name][event],
-                        trace_root_fqn,
-                        string,
-                    )
-                    + " ~> "
+        if type(event) is int and event in indexed_traces:
+            string += trace_to_string(
+                    dump_name,
+                    indexed_traces[event],
+                    trace_root_fqn,
+                    string,
                 )
-            else:
-                pass
-                # print("Trace not indexed-------------------------")
         else:
-            event_string = event_to_str(event, trace_root_fqn)
-            # if not trace_root_fqn in recursions_per_trace:
-            #    recursions_per_trace[trace_root_fqn] = 0
-            if event_string in vocab_counter:
-                vocab_counter[event_string] += 1
-            else:
-                vocab_counter[event_string] = 1
-            string += event_string
-
+            string += event_to_str(event, trace_root_fqn, trace['class_name'], trace['method_name'])
     return string
 
 
-def trace_to_java_calls(dump_name, trace, trace_root_fqn, recursive=True):
-    # string = trace["method_name"] + " "
+def trace_to_java_calls(dump_name, trace, trace_root_fqn):
     java_calls = 0
     if not trace_root_fqn:
         trace_root_fqn = dump_name + "." + trace["method_name"]
     for event in trace["method_events"]:
-        if recursive and type(event) is int:
-            # print('Trace indexed')
-            # pass
-            if event in indexed_traces[dump_name]:
-                if trace_root_fqn in recursions_per_trace:
-                    recursions_per_trace[trace_root_fqn] += 1
-                else:
-                    recursions_per_trace[trace_root_fqn] = 1
-                java_calls += trace_to_java_calls(
-                    dump_name, indexed_traces[event], trace_root_fqn
-                )
-            else:
-                pass
-                # print('Trace not indexed')
+        if type(event) is int and event in indexed_traces:
+            java_calls += trace_to_java_calls(
+                dump_name, indexed_traces[event], trace_root_fqn
+            )
         else:
-            # event_string =
-            # if not trace_root_fqn in recursions_per_trace:
-            #    recursions_per_trace[trace_root_fqn] = 0
-            # if event_string in vocab_counter:
-            #     vocab_counter[event_string] += 1
-            # else:
-            #     vocab_counter[event_string] = 1
             if event["event_kind"] == "method_call":
                 java_calls += event_java_calls(event)
-    indexed_traces[trace["index"]] = trace
     return java_calls
-
-
-def process_file(filename):
-    stem = Path(filename).stem
-    traces_in_dump = []
-    with gzip.open(filename, "rb") as f:
-        for line in f:
-            if stem in dump_counter:
-                dump_counter[stem] += 1
-            else:
-                dump_counter[stem] = 0
-            traces_in_dump.append(json.loads(line))
-    dumps[stem] = traces_in_dump
-    # print(trace_to_string(sample_dump, sample_trace, '')[:-1])
-    string_traces = []
-    for dump_name, traces in dumps.items():
-        for trace in traces:
-            class_name = trace["class_name"]
-            string_traces.append(
-                trace_to_string(dump_name, trace, "", trace["method_name"]) + "\n"
-            )
-    # longest_string = max(string_traces, key=len)
-    # print(longest_string)
-    # print(f"API counter: {api_counter}")
-    # print(f"Recursions per trace: {recursions_per_trace}")
-    for k in calls_per_trace.keys():
-        if not k in recursions_per_trace:
-            recursions_per_trace[k] = 0
-    pkl = {
-        "recursions_per_trace": recursions_per_trace,
-        "distinct_calls": distinct_calls,
-        "vocab_counter": vocab_counter,
-        "api_counter": api_counter,
-        "calls_per_trace": calls_per_trace,
-    }
-    with open(f"pickles1/{stem}.pkl", "wb") as f:
-        pickle.dump(pkl, f)
-    # sort_vocab = {k: v for k, v in sorted(vocab_counter.items(), key=lambda item: item[1])}
-    # print(f"Number of distinct calls: {len(distinct_calls.keys())}") # 230 distinct calls
-    # print(f"Vocab values (event string freq): {sort_vocab.values()}")
-    # print(f"Number of string traces: {len(string_traces)}")
-    # print(f"Indexed traces: {len(indexed_traces)}")
-    # print(f"Number of traces: {len(traces)}")
-    with open(f"datasets1/{stem}_data_set.txt", "w") as out:
-        out.writelines(string_traces)
-    # recursions_per_trace_counter = {k: v for k, v in sorted(recursions_per_trace.items(), reverse=True, key=lambda item: item[1])}.values()
-    # print(f"Recursions per trace counter: {recursions_per_trace_counter}")
-    # api_counter_sort = {k: v for k, v in sorted(api_counter.items(), reverse=True, key=lambda item: item[1])}
-    # import itertools
-    # api_counter_sorted = dict(itertools.islice(api_counter_sort.items(), 30))
-    # print(f"api_counter_sorted: {api_counter_sorted}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process a gzipped trace.")
@@ -314,20 +174,21 @@ if __name__ == "__main__":
     dumps = {}
     dump_counter = {}
     filename = Path(args.path)
-    # process_file(filename)
     if os.path.getsize(filename) < 1:
         exit()
     files = {}
     string_traces = []
     visited = []
+    visit_counter = Counter()
     loc_vs_calls = {}
     for method in get_core_methods(filename):
         class_name = method["class_name"]
         method_name = method["method_name"]
-        if f"{class_name}:{method_name}" in visited:
-            continue
-        else:
-            visited.append(f"{class_name}:{method_name}")
+        # if f"{class_name}:{method_name}" in visited:
+        #     continue
+        # else:
+        #     visited.append(f"{class_name}:{method_name}")
+        visit_counter[f"{class_name}:{method_name}"] += 1
         trace_java_calls = trace_to_java_calls(filename.stem, method, "")
         # if trace_java_calls < 1:
         #     continue
@@ -454,17 +315,17 @@ if __name__ == "__main__":
                         print(grep.stdout)
 
                     print("----------------------------\n")
-
+    print(visit_counter)
         # print(f"        Method calls {lines_of_code} lines of code")s
         # print(f"        {event['event_kind']}: {event.get('line_numbers')}")
         # print('===============================')
         # breaks
     # print(fisles)
-    df = pd.DataFrame.from_dict(loc_vs_calls, orient='index', columns=['num_calls', 'span', 'executed'])
-    existing = pd.read_csv("test.csv", index_col='fqn')
-    print(existing)
-    print(df)
-    pd.concat([df,existing]).to_csv("test.csv", index_label='fqn')
+    # df = pd.DataFrame.from_dict(loc_vs_calls, orient='index', columns=['num_calls', 'span', 'executed'])
+    # existing = pd.read_csv("test.csv", index_col='fqn')
+    # print(existing)
+    # print(df)
+    # pd.concat([df,existing]).to_csv("test.csv", index_label='fqn')
 # ls -1 /Users/claudio/projects/binarydecomp/Jackal/repos/**/*.gz | xargs -n 1 -P 8 -I% timeout 1h poetry run python trace_parse.py %
 
 def multiline_match():
