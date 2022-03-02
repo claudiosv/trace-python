@@ -18,6 +18,8 @@ calls_per_trace = {}  # dump_name.trace: \d
 recursions_per_trace = {}  # dump_name.trace: \d
 api_counter = {}
 
+# find /Users/claudio/projects/binarydecomp/Jackal/repos -iname "*_java.gz" -print0 | xargs -0 poetry run python trace_parse.py | ansi2html > report.html
+
 
 def get_core_methods(path,index_traces=True):
     """Generates a stream of core method events from a traced test suite."""
@@ -169,7 +171,12 @@ def trace_to_java_calls(dump_name, trace, trace_root_fqn):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process a gzipped trace.")
     parser.add_argument("path", metavar="Path", type=Path)
+    parser.add_argument("show_source", type=Boolean)
+    parser.add_argument("mode", choices=["one_call","extract", "loc"])
     args = parser.parse_args()
+    one_call = args.mode == 'one_call'
+    loc = args.mode == 'loc'
+    extract = args.mode == 'extract'
 
     dumps = {}
     dump_counter = {}
@@ -184,17 +191,17 @@ if __name__ == "__main__":
     for method in get_core_methods(filename):
         class_name = method["class_name"]
         method_name = method["method_name"]
-        # if f"{class_name}:{method_name}" in visited:
-        #     continue
-        # else:
-        #     visited.append(f"{class_name}:{method_name}")
+        if one_call and f"{class_name}:{method_name}" in visited:
+            continue
+        else:
+            visited.append(f"{class_name}:{method_name}")
         visit_counter[f"{class_name}:{method_name}"] += 1
         trace_java_calls = trace_to_java_calls(filename.stem, method, "")
-        # if trace_java_calls < 1:
-        #     continue
+        if one_call and trace_java_calls < 1:
+            continue
         s_trace = trace_to_string(filename.stem, method, "", '')
-        # string_traces.append(s_trace)
-        # print(s_trace)
+        if extract:
+            string_traces.append(s_trace)
 
         just_class_name = class_name.rpartition(".")[-1]
         just_method_name = method_name.partition("$")[0]
@@ -204,9 +211,7 @@ if __name__ == "__main__":
             f"    Analyzing trace {method['index']} FQN: {method['class_name']} : {method_name}"
         )
         print(f"        Method makes {trace_java_calls} calls to java: {s_trace}")
-        # print(f"        Abstract: {s_trace}")
-        #  find /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/ -name "Counters.java"
-        #  grep /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io//file/Counters.java longCounter
+
         heuristic_path = (
             filename.parents[1]
             / "src"
@@ -222,7 +227,6 @@ if __name__ == "__main__":
             print(f"{class_name}:{method_name}")
             continue
         files[heuristic_path] = size
-        # print(f"    Heuristic source: {heuristic_path}")
 
         lines_of_code = 0
         for event in method["method_events"]:
@@ -236,7 +240,6 @@ if __name__ == "__main__":
                         print("         Something went wrong! 1")
                         pass
                     elif len(line_numbers) == 1:
-                        # print(f"        One liner ({event.get('line_numbers')})")
                         loc_vs_calls[f"{class_name}:{method_name}"] = (trace_java_calls, 1, 1)
                         print(
                             f"    Analyzing {event['event_kind']} event:"
@@ -246,37 +249,34 @@ if __name__ == "__main__":
                         print(f"        Anonymous classes: {anonymous_classes}")
                         print(f"        One liner ({event.get('line_numbers')})")
                         print(f"        Source snippet:")
-                        # print("             -> Something went wrong! 3")
-                        sed_1 = subprocess.Popen(
-                            (
-                                "sed",
-                                f"{min(line_numbers[0], line_numbers[0]-2)},{line_numbers[-1]}!d;=",
-                                heuristic_path,
-                            ),
-                            stdout=subprocess.PIPE,
-                        )
-                        sed_2 = subprocess.Popen(
-                            ("sed", "N;s/\\n/ /"),
-                            stdin=sed_1.stdout,
-                            stdout=subprocess.PIPE,
-                        )
-                        grep = subprocess.run(
-                            ("grep", "--color=always", "-E", f"(^({line_numbers[0]}).*)|^"),
-                            check=False,
-                            stdin=sed_2.stdout,
-                            text=True,
-                            capture_output=True
+                        if args.show_source:
+                            sed_1 = subprocess.Popen(
+                                (
+                                    "sed",
+                                    f"{min(line_numbers[0], line_numbers[0]-2)},{line_numbers[-1]}!d;=",
+                                    heuristic_path,
+                                ),
+                                stdout=subprocess.PIPE,
                             )
-                        sed_1.wait()
-                        sed_2.wait()
-                        print(grep.stdout)
-                        # one_line match
+                            sed_2 = subprocess.Popen(
+                                ("sed", "N;s/\\n/ /"),
+                                stdin=sed_1.stdout,
+                                stdout=subprocess.PIPE,
+                            )
+                            grep = subprocess.run(
+                                ("grep", "--color=always", "-E", f"(^({line_numbers[0]}).*)|^"),
+                                check=False,
+                                stdin=sed_2.stdout,
+                                text=True,
+                                capture_output=True
+                                )
+                            sed_1.wait()
+                            sed_2.wait()
+                            print(grep.stdout)
                     else:
                         distance = max(line_numbers) - min(line_numbers)
-                        # print(f"        {distance+1} / {len(event.get('line_numbers'))} lines ({event.get('line_numbers')})")
                         extended_line_numbers = list(map(str, line_numbers))
                         line_regex = "|".join(extended_line_numbers)  # str(None) "None"
-                        # sed '1022,1030!d;=' /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/file/PathUtils.java | sed 'N;s/\n/ /' | grep --color -E '(^(1023|1024|1028|1030).*)|^'
                         print(
                                 f"    Analyzing {event['event_kind']} event:"
                             )
@@ -289,30 +289,30 @@ if __name__ == "__main__":
                         print(f"        Source snippet:")
                         loc_vs_calls[f"{class_name}:{method_name}"] = (trace_java_calls, distance+1, len(event.get('line_numbers')))
 
-                        sed_1 = subprocess.Popen(
-                            (
-                                "sed",
-                                f"{min(line_numbers[0], line_numbers[0]-2)},{line_numbers[-1]}!d;=",
-                                heuristic_path,
-                            ),
-                            stdout=subprocess.PIPE,
-                        )
-                        # sed_2 = subprocess.check_output(('sed', 'N;s/\\n/ /'), stdin=sed_1.stdout)
-                        sed_2 = subprocess.Popen(
-                            ("sed", "N;s/\\n/ /"),
-                            stdin=sed_1.stdout,
-                            stdout=subprocess.PIPE,
-                        )
-                        grep = subprocess.run(
-                            ("grep", "--color=always", "-E", f"(^({line_regex}).*)|^"),
-                            check=False,
-                            stdin=sed_2.stdout,
-                            text=True,
-                            capture_output=True
-                        )
-                        sed_1.wait()
-                        sed_2.wait()
-                        print(grep.stdout)
+                        if args.show_source:
+                            sed_1 = subprocess.Popen(
+                                (
+                                    "sed",
+                                    f"{min(line_numbers[0], line_numbers[0]-2)},{line_numbers[-1]}!d;=",
+                                    heuristic_path,
+                                ),
+                                stdout=subprocess.PIPE,
+                            )
+                            sed_2 = subprocess.Popen(
+                                ("sed", "N;s/\\n/ /"),
+                                stdin=sed_1.stdout,
+                                stdout=subprocess.PIPE,
+                            )
+                            grep = subprocess.run(
+                                ("grep", "--color=always", "-E", f"(^({line_regex}).*)|^"),
+                                check=False,
+                                stdin=sed_2.stdout,
+                                text=True,
+                                capture_output=True
+                            )
+                            sed_1.wait()
+                            sed_2.wait()
+                            print(grep.stdout)
 
                     print("----------------------------\n")
     print(visit_counter)
@@ -322,13 +322,11 @@ if __name__ == "__main__":
         # breaks
     # print(fisles)
     # df = pd.DataFrame.from_dict(loc_vs_calls, orient='index', columns=['num_calls', 'span', 'executed'])
-    # existing = pd.read_csv("test.csv", index_col='fqn')
-    # print(existing)
-    # print(df)
-    # pd.concat([df,existing]).to_csv("test.csv", index_label='fqn')
+    # existing = pd.read_csv("methods.csv", index_col='fqn')
+    # pd.concat([df,existing]).to_csv("methods.csv", index_label='fqn')
 # ls -1 /Users/claudio/projects/binarydecomp/Jackal/repos/**/*.gz | xargs -n 1 -P 8 -I% timeout 1h poetry run python trace_parse.py %
 
-def multiline_match():
+def multiline_match(grep, anonymous_methods, anonymous_classes, just_method_name, just_class_name, method_name):
     grep_out = grep.stdout.decode("UTF-8")
     grep_lines = grep_out.split("\n")
     matching = False
@@ -351,117 +349,12 @@ def multiline_match():
             f" {just_class_name}" in grep_out
             or "         //" in grep_lines[0]
         ):
-            # THIS IS A PROBLEM, but not one for now, notice the visitFile method name but it is deep in the class
-            """
-            Analyzing FQN: org.apache.commons.io.file.DeletingPathVisitor:visitFile
-                Heuristic source: /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/file/DeletingPathVisitor.java
-                    Anonymous methods: []
-                    Anonymous classes: []
-                    One liner ([37])
-                         -> Something went wrong! 3
-            36  */
-            37 public class DeletingPathVisitor extends CountingPathVisitor {
-            """
-            # Here the problem is that the method def is too high up due to comments
-            """
-    Analyzing FQN: org.apache.commons.io.output.DeferredFileOutputStream:toInputStream
-    Heuristic source: /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/output/DeferredFileOutputStream.java
-        Anonymous methods: []
-        Anonymous classes: []
-        8 / 3 lines ([271, 275, 278])
-             -> Something went wrong! 3
-269         // but we should force the habit of closing whether we are working with
-270         // a file or memory.
-271         if (!closed) {
-272             throw new IOException("Stream not closed");
-273         }
-274
-275         if (isInMemory()) {
-276             return memoryOutputStream.toInputStream();
-277         }
-278         return Files.newInputStream(outputPath);
-        """
-        pass
+            pass
+        else:
+            print("             -> Something went wrong! 2")
+            print(grep.stdout.decode("UTF-8"))
     elif just_method_name == "lambda" and (f"->" in grep_out):
-        """
-        Analyzing FQN: org.apache.commons.io.input.CharacterFilterReader:lambda$new$0
-            Heuristic source: /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/input/CharacterFilterReader.java
-                Anonymous methods: ['new', '0']
-                Anonymous classes: []
-                One liner ([38])
-                     -> Something went wrong! 3
-        37     public CharacterFilterReader(final Reader reader, final int skip) {
-        38         super(reader, c -> c == skip);
-        """
         pass
     else:
         print("             -> Something went wrong! 3")
         print(grep.stdout.decode("UTF-8"))
-def one_line_match():
-    grep_out = grep.stdout.decode("UTF-8")
-    grep_lines = grep_out.split("\n")
-    matching = False
-    if len(anonymous_methods) > 0 or len(anonymous_classes) > 0:
-        # anonymous class or method, be more generous with matching
-        for m in anonymous_methods:
-            if m in grep_out:
-                matching = True
-        for c in anonymous_classes:
-            if c in grep_out:
-                matching = True
-
-    for i in range(0, min(3, len(grep_lines))):
-        if f" {method_name}" in grep_lines[i]:
-            # not anonymous class or method
-            matching = True
-
-    if not matching:
-        if f" {just_class_name}" in grep_out or "         //" in grep_lines[0]:
-            # THIS IS A PROBLEM, but not one for now, notice the visitFile method name but it is deep in the class
-            """
-            Analyzing FQN: org.apache.commons.io.file.DeletingPathVisitor:visitFile
-                Heuristic source: /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/file/DeletingPathVisitor.java
-                    Anonymous methods: []
-                    Anonymous classes: []
-                    One liner ([37])
-                         -> Something went wrong! 3
-            36  */
-            37 public class DeletingPathVisitor extends CountingPathVisitor {
-            """
-            # Here the problem is that the method def is too high up due to comments
-            """
-    Analyzing FQN: org.apache.commons.io.output.DeferredFileOutputStream:toInputStream
-    Heuristic source: /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/output/DeferredFileOutputStream.java
-        Anonymous methods: []
-        Anonymous classes: []
-        8 / 3 lines ([271, 275, 278])
-             -> Something went wrong! 3
-269         // but we should force the habit of closing whether we are working with
-270         // a file or memory.
-271         if (!closed) {
-272             throw new IOException("Stream not closed");
-273         }
-274
-275         if (isInMemory()) {
-276             return memoryOutputStream.toInputStream();
-277         }
-278         return Files.newInputStream(outputPath);
-                                """
-            pass
-        elif just_method_name == "lambda" and (f"->" in grep_out):
-            """
-            Analyzing FQN: org.apache.commons.io.input.CharacterFilterReader:lambda$new$0
-                Heuristic source: /Users/claudio/projects/binarydecomp/Jackal/repos/commons-io/src/main/java/org/apache/commons/io/input/CharacterFilterReader.java
-                    Anonymous methods: ['new', '0']
-                    Anonymous classes: []
-                    One liner ([38])
-                         -> Something went wrong! 3
-            37     public CharacterFilterReader(final Reader reader, final int skip) {
-            38         super(reader, c -> c == skip);
-            """
-            pass
-        else:
-            print("             -> Something went wrong! 3")
-            print(grep.stdout.decode("UTF-8"))
-
-# find /Users/claudio/projects/binarydecomp/Jackal/repos -iname "*_java.gz" -print0 | xargs -0 poetry run python trace_parse.py | ansi2html > report.html
