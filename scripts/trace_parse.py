@@ -12,11 +12,6 @@ from collections import Counter
 
 
 indexed_traces = {}  # dump: []
-vocab_counter = {}
-distinct_calls = {}
-calls_per_trace = {}  # dump_name.trace: \d
-recursions_per_trace = {}  # dump_name.trace: \d
-api_counter = {}
 
 # find /Users/claudio/projects/binarydecomp/Jackal/repos -iname "*_java.gz" -print0 | xargs -0 poetry run python trace_parse.py | ansi2html > report.html
 # ls -1 /Users/claudio/projects/binarydecomp/Jackal/repos/**/*.gz | xargs -n 1 -P 8 -I% timeout 1h poetry run python trace_parse.py %
@@ -32,7 +27,7 @@ def get_core_methods(path, index_traces=True):
     suite_name = path.name.replace("_", "/").split("/")[:-1]
     heuristic_path = (
         path.parents[1] / "src" / "test" / "java" / ("/".join(suite_name) + ".java")
-    )  # (path.replace('_', '.').split('.')[3:-1] + '.java')
+    )
 
     size = 0
     try:
@@ -120,51 +115,6 @@ def method_entry_to_debug_str(
     return method_repr
 
 
-# def event_to_str(event: dict, method_class: str, method_name: str) -> tuple[str, str]:
-
-#     return java_only, all_calls
-
-
-# def event_java_calls(event):
-#     """Used for counting number of java.* calls"""
-#     called_class_name = event["called_class_name"]
-#     if called_class_name.startswith("java."):
-#         return 1
-#     else:
-#         return 0
-
-
-# def trace_to_string(dump_name, trace, trace_root_fqn, string):
-# if not trace_root_fqn:
-#     trace_root_fqn = dump_name + "." + trace["method_name"]
-# for event in trace["method_events"]:
-#     if type(event) is int and event in indexed_traces:
-#         string += trace_to_string(
-#                 dump_name,
-#                 indexed_traces[event],
-#                 trace_root_fqn,
-#                 string,
-#             )
-#     else:
-#         string += event_to_str(event, trace_root_fqn, trace['class_name'], trace['method_name'])
-# return string
-
-
-# def trace_to_java_calls(dump_name, trace, trace_root_fqn):
-#     java_calls = 0
-#     if not trace_root_fqn:
-#         trace_root_fqn = dump_name + "." + trace["method_name"]
-#     for event in trace["method_events"]:
-#         if type(event) is int and event in indexed_traces:
-#             java_calls += trace_to_java_calls(
-#                 dump_name, indexed_traces[event], trace_root_fqn
-#             )
-#         else:
-#             if event["event_kind"] == "method_call":
-#                 java_calls += event_java_calls(event)
-#     return java_calls
-
-
 def traverse_call_graph(
     trace: dict, call_counter: Counter, java_calls: str, all_calls: str, root: bool
 ) -> tuple[Counter, str, str]:  # counter of calls, java_calls, all_calls
@@ -180,7 +130,7 @@ def traverse_call_graph(
             e_k = event["event_kind"]
             method_class = trace["class_name"]
             method_name = trace["method_name"]
-            if e_k == "method_entry" and not(root):
+            if e_k == "method_entry" and not (root):
                 method_entry_repr = method_entry_to_debug_str(
                     method_class,
                     method_name,
@@ -244,20 +194,6 @@ if __name__ == "__main__":
     loc_vs_calls = {}
 
     method_dicts = []
-    # TestSuite FQN (dump name) ClassName MethodName Index HeuristicFileName Calls array
-
-    # if one_call and f"{class_name}:{method_name}" in visited:
-    #     continue
-    # else:
-    #     visited.append(f"{class_name}:{method_name}")
-    # visit_counter[f"{class_name}:{method_name}"] += 1
-    # trace_java_calls = trace_to_java_calls(file_stem, method, "")
-
-    # if one_call and trace_java_calls < 1:
-    # continue
-    # s_trace = trace_to_string(file_stem, method, "", '')
-    # if extract:
-    # string_traces.append(s_trace)
 
     for method in get_core_methods(file_name):
         call_counter = Counter()
@@ -294,7 +230,7 @@ if __name__ == "__main__":
             print(f"{heuristic_path} FILE NOT FOUND!")
             print(f"{class_name}:{method_name}")
             continue
-        # files[heuristic_path] = size
+
         method_dict_template = {
             "test_suite": file_stem,  # this is the dump name
             "index_in_dump": method["index"],
