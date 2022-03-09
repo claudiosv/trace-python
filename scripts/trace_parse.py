@@ -12,9 +12,35 @@ from collections import Counter
 
 
 indexed_traces = {}  # dump: []
+#  find . -name classpath_X4PmlaxV -or -name paths_X4PmlaxV -or -name paths_X4PmlaxV_find -or -name paths_X4PmlaxV_strace -type f -print0 | xargs -0 rm
 
-# find /Users/claudio/projects/binarydecomp/Jackal/repos -iname "*_java.gz" -print0 | xargs -0 poetry run python trace_parse.py | ansi2html > report.html
+# find /Users/claudio/projects/binarydecomp/Jackal/repos -iname "*_java.gz" -print0 | xargs -0 poetry run python trace_parse.py | aha > report.html
+# find /data/claudios/trace_projects/commons-io/ -iname "*_java.gz" -size +2c -printf '%s\t%p\n' | sort -n | cut -f2- | xargs poetry run python trace_parse.py | aha > report.html
 # ls -1 /Users/claudio/projects/binarydecomp/Jackal/repos/**/*.gz | xargs -n 1 -P 8 -I% timeout 1h poetry run python trace_parse.py %
+# find /data/claudios/trace_projects/commons-io/ -iname "*_java.gz" -size +2c -type f -exec ls -lh {} \;
+# proj=geronimo-config find /data/claudios/apache_projects/$proj/  -iname "*_java.gz" -size +2c -printf '%s\t%p\n' | sort -n | cut -f2- | xargs -P1 -I% (poetry run python scripts/trace_parse.py % show_source verbose loc | aha > reports/$proj_%.html)
+# find /data/claudios/trace_projects/commons-lang/  -name "*_java.gz" -size +2c -size -100M -printf '%s\t%p\n' | sort -n | cut -f2- | xargs -P1 -I {} sh -c "(poetry run python scripts/trace_parse.py {} show_source verbose loc | aha > reports/commons-lang_{}.html)"
+# set +H; pcre2grep -M  -r  "Considering: (?<class>(\w|$|/)*) (?<type>\w*)\nInstrumenting: \k<class>\nConsidering: \k<class>\\\$1 (?!\k<type>)" .
+#  pcre2grep -M  -r  "Considering: (?<class>(\w|$|/)*) (?<type>\w*)\nInstrumenting: \k<class>\nConsidering: \k<class>.{0,30} (?!\k<type>)" .
+# java -jar docker-setup/orchestrator.jar one_list.txt $PWD/Outputs/ $PWD/m2/ 8 > 2022_04_03.log 2>2022_04_03.errors
+# -newermt yesterday
+# find /data/claudios/apache_projects/ /data/claudios/trace_projects/ /data/claudios/eclipse_projects/ /data/claudios/projects/ /ssd/claudios/jenkinsci_jenkins/ -type f -name "*java.gz" -size +2c  -exec ls -lh {} \; > files_thurs1.txt
+
+
+def clean_event(event):
+    if isinstance(event, int):
+        return event
+    del_keys = event.keys() - {
+        "event_kind",
+        "called_class_name",
+        "called_method_name",
+        "parameter_types",
+        "line_numbers",
+        "return_type",
+    }
+    for key in del_keys:
+        del event[key]
+    return event
 
 
 def get_core_methods(path, index_traces=True):
@@ -46,7 +72,18 @@ def get_core_methods(path, index_traces=True):
             except:
                 print("JSON error? line", line_ix, "of file", path)
                 continue
-            indexed_traces[data["index"]] = data
+            indexed_traces[data["index"]] = {
+                "index": data["index"],
+                "class_name": data["class_name"],
+                "method_name": data["method_name"],
+                "method_events": [
+                    clean_event(e)
+                    for e in data["method_events"]
+                    if isinstance(e, int)
+                    or e["event_kind"] in ["method_entry", "method_call", "method_exit"]
+                ],
+            }
+            del data
     for key, data in indexed_traces.items():  # this is the number of traces
         class_name = data["class_name"]
         method_name = data["method_name"]
@@ -159,6 +196,9 @@ def traverse_call_graph(
                     all_calls += " ⇧ " + event["return_type"]
                 else:
                     all_calls += " ⇧"
+            else:
+                pass
+                # print(event)
     return (call_counter, java_calls, all_calls)
 
 
