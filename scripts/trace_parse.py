@@ -9,22 +9,10 @@ from pathlib import Path
 import subprocess
 import pandas as pd
 from collections import Counter
+from typing import List, Tuple
 
 
 indexed_traces = {}  # dump: []
-#  find . -name classpath_X4PmlaxV -or -name paths_X4PmlaxV -or -name paths_X4PmlaxV_find -or -name paths_X4PmlaxV_strace -type f -print0 | xargs -0 rm
-
-# find /Users/claudio/projects/binarydecomp/Jackal/repos -iname "*_java.gz" -print0 | xargs -0 poetry run python trace_parse.py | aha > report.html
-# find /data/claudios/trace_projects/commons-io/ -iname "*_java.gz" -size +2c -printf '%s\t%p\n' | sort -n | cut -f2- | xargs poetry run python trace_parse.py | aha > report.html
-# ls -1 /Users/claudio/projects/binarydecomp/Jackal/repos/**/*.gz | xargs -n 1 -P 8 -I% timeout 1h poetry run python trace_parse.py %
-# find /data/claudios/trace_projects/commons-io/ -iname "*_java.gz" -size +2c -type f -exec ls -lh {} \;
-# proj=geronimo-config find /data/claudios/apache_projects/$proj/  -iname "*_java.gz" -size +2c -printf '%s\t%p\n' | sort -n | cut -f2- | xargs -P1 -I% (poetry run python scripts/trace_parse.py % show_source verbose loc | aha > reports/$proj_%.html)
-# find /data/claudios/trace_projects/commons-lang/  -name "*_java.gz" -size +2c -size -100M -printf '%s\t%p\n' | sort -n | cut -f2- | xargs -P1 -I {} sh -c "(poetry run python scripts/trace_parse.py {} show_source verbose loc | aha > reports/commons-lang_{}.html)"
-# set +H; pcre2grep -M  -r  "Considering: (?<class>(\w|$|/)*) (?<type>\w*)\nInstrumenting: \k<class>\nConsidering: \k<class>\\\$1 (?!\k<type>)" .
-#  pcre2grep -M  -r  "Considering: (?<class>(\w|$|/)*) (?<type>\w*)\nInstrumenting: \k<class>\nConsidering: \k<class>.{0,30} (?!\k<type>)" .
-# java -jar docker-setup/orchestrator.jar one_list.txt $PWD/Outputs/ $PWD/m2/ 8 > 2022_04_03.log 2>2022_04_03.errors
-# -newermt yesterday
-# find /data/claudios/apache_projects/ /data/claudios/trace_projects/ /data/claudios/eclipse_projects/ /data/claudios/projects/ /ssd/claudios/jenkinsci_jenkins/ -type f -name "*java.gz" -size +2c  -exec ls -lh {} \; > files_thurs1.txt
 
 
 def clean_event(event):
@@ -135,7 +123,7 @@ def type_list(types):
 
 
 def method_call_to_debug_str(
-    class_name: str, method_name: str, parameter_types: list[str], return_type: str
+    class_name: str, method_name: str, parameter_types: List[str], return_type: str
 ) -> str:
     method_repr = (
         f" -> {class_name}.{method_name}({type_list(parameter_types)}): {return_type}"
@@ -144,7 +132,7 @@ def method_call_to_debug_str(
 
 
 def method_entry_to_debug_str(
-    class_name: str, method_name: str, parameter_types: list[str], return_type: str
+    class_name: str, method_name: str, parameter_types: List[str], return_type: str
 ) -> str:
     method_repr = (
         f" -> {class_name}.{method_name}({type_list(parameter_types)}): {return_type}"
@@ -154,15 +142,18 @@ def method_entry_to_debug_str(
 
 def traverse_call_graph(
     trace: dict, call_counter: Counter, java_calls: str, all_calls: str, root: bool
-) -> tuple[Counter, str, str]:  # counter of calls, java_calls, all_calls
+) -> Tuple[Counter, str, str]:  # counter of calls, java_calls, all_calls
     for event in trace["method_events"]:
-        if type(event) is int and event in indexed_traces:
-            call_counter_child, java_calls_child, all_calls_child = traverse_call_graph(
-                indexed_traces[event], call_counter, java_calls, all_calls, False
-            )
-            call_counter += call_counter_child
-            java_calls += java_calls_child
-            all_calls += all_calls_child
+        if type(event) is int:
+            if event in indexed_traces:
+                call_counter_child, java_calls_child, all_calls_child = traverse_call_graph(
+                    indexed_traces[event], call_counter, java_calls, all_calls, False
+                )
+                call_counter += call_counter_child
+                java_calls += java_calls_child
+                all_calls += all_calls_child
+            else:
+                print("Trace not found in index")
         else:
             e_k = event["event_kind"]
             method_class = trace["class_name"]
