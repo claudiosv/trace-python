@@ -38,7 +38,8 @@ def get_core_methods(path, test_path, index_traces=True):
     # once we have seen its entire execution.
     fanout = set()
     line_ix = 0
-    suite_name = path.name.replace("_", "/").split("/")[:-1]
+    suite_name = path.name.replace("_", "/").split("/")
+    suite_name[-1] = suite_name[-1].partition('.')[0]
     if test_path:
         search_root = test_path
     else:
@@ -47,13 +48,14 @@ def get_core_methods(path, test_path, index_traces=True):
             / "test"
             / "java")
     heuristic_path = (
-        search_root / ("/".join(suite_name) + ".java")
+        search_root / (("/".join(suite_name) + ".java"))
     )
 
     size = 0
     try:
         size = os.path.getsize(heuristic_path)
     except FileNotFoundError:
+        print(suite_name)
         print(f"{heuristic_path} SUITE NOT FOUND!")
         # continue
     print(
@@ -86,8 +88,8 @@ def get_core_methods(path, test_path, index_traces=True):
         # Heuristically detect test case entries.
         is_test_class = "test" in class_name.lower()
         is_junit_class = "junit" in class_name.lower()
-        if is_junit_class:
-            print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
+        #if is_junit_class:
+        #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
         is_test_case = is_test_class and method_name.startswith("test")
 
@@ -115,7 +117,7 @@ def get_core_methods(path, test_path, index_traces=True):
 
         # Yield only non-test methods.
         if (
-            not is_test_class
+            not is_test_class and not is_junit_class
         ):  # Focus on test classes to exclude calls from test cases to other test util functions.
             # pass
             yield data
@@ -152,6 +154,7 @@ def traverse_call_graph(
 ) -> Tuple[Counter, str, str]:  # counter of calls, java_calls, all_calls
     for event in trace["method_events"]:
         if type(event) is int:
+            continue
             if event in indexed_traces:
                 call_counter_child, java_calls_child, all_calls_child = traverse_call_graph(
                     indexed_traces[event], call_counter, java_calls, all_calls, False
