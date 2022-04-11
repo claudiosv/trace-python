@@ -14,6 +14,7 @@ from typing import List, Tuple
 
 indexed_traces = {}  # dump: []
 
+heuristic_suite_path = ''
 
 def clean_event(event):
     if isinstance(event, int):
@@ -47,16 +48,16 @@ def get_core_methods(path, test_path, index_traces=True):
             / "src"
             / "test"
             / "java")
-    heuristic_path = (
-        search_root / (("/".join(suite_name) + ".java"))
+    heuristic_suite_path = (
+        search_root / ("/".join(suite_name) + ".java")
     )
 
     size = 0
     try:
-        size = os.path.getsize(heuristic_path)
+        size = os.path.getsize(heuristic_suite_path)
     except FileNotFoundError:
         print(suite_name)
-        print(f"{heuristic_path} SUITE NOT FOUND!")
+        print(f"{heuristic_suite_path} SUITE NOT FOUND!")
         # continue
     print(
         f"Opening dump of {('.'.join(suite_name) + '.java')} (size: {size}) from {path}:"
@@ -91,7 +92,7 @@ def get_core_methods(path, test_path, index_traces=True):
         #if is_junit_class:
         #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
-        is_test_case = is_test_class and method_name.startswith("test")
+        is_test_case = is_test_class and method_name.startswith("test") # we could skip junit classes too
 
         # Skip methods that don't belong to either category of interest.
         if not is_test_case and not fanout:
@@ -150,14 +151,17 @@ def method_entry_to_debug_str(
 
 
 def traverse_call_graph(
-    trace: dict, call_counter: Counter, java_calls: str, all_calls: str, root: bool
+    trace: dict, call_counter: Counter, java_calls: str, all_calls: str, depth: int, max_depth: int
 ) -> Tuple[Counter, str, str]:  # counter of calls, java_calls, all_calls
+    if depth > max_depth and not max_depth == -1:
+        return (call_counter, java_calls, all_calls)
+    depth += 1
     for event in trace["method_events"]:
         if type(event) is int:
             continue
             if event in indexed_traces:
                 call_counter_child, java_calls_child, all_calls_child = traverse_call_graph(
-                    indexed_traces[event], call_counter, java_calls, all_calls, False
+                    indexed_traces[event], call_counter, java_calls, all_calls, depth, max_depth
                 )
                 call_counter += call_counter_child
                 java_calls += java_calls_child
@@ -168,12 +172,12 @@ def traverse_call_graph(
             e_k = event["event_kind"]
             method_class = trace["class_name"]
             method_name = trace["method_name"]
-            if e_k == "method_entry" and not (root):
+            if e_k == "method_entry" and depth > 0:
                 method_entry_repr = method_entry_to_debug_str(
                     method_class,
                     method_name,
                     event.get("parameter_types", [""]),
-                    event["return_type"],
+                    event.get("return_type", "void"),
                 )
                 all_calls += method_entry_repr
             elif e_k == "method_call":
@@ -184,7 +188,7 @@ def traverse_call_graph(
                     called_class_name,
                     called_method_name,
                     event.get("parameter_types", [""]),
-                    event.get("return_type", ""),
+                    event.get("return_type", "void"),
                 )
                 all_calls += method_call_repr
 
@@ -193,10 +197,7 @@ def traverse_call_graph(
 
                 call_counter[f"{called_class_name}.{called_method_name}"] += 1
             elif e_k == "method_exit":
-                if "return_type" in event:
-                    all_calls += " ⇧ " + event["return_type"]
-                else:
-                    all_calls += " ⇧"
+                all_calls += " ⇧ " + event.get("return_type", "void")
             else:
                 pass
                 # print(event)
@@ -217,6 +218,7 @@ if __name__ == "__main__":
     parser.add_argument("--test_path", metavar="Path", type=Path, required=False)
     parser.add_argument("--show_source", type=bool, action=argparse.BooleanOptionalAction)
     parser.add_argument("--verbose", type=bool, action=argparse.BooleanOptionalAction)
+    parser.add_argument("--max_depth", type=int)
     parser.add_argument("path", metavar="Path", type=Path)
 
     # parser.add_argument("mode", choices=["one_call", "extract", "loc"])
@@ -251,7 +253,7 @@ if __name__ == "__main__":
         anonymous_classes = class_name.split("$")[1:]
         anonymous_methods = method_name.split("$")[1:]
         call_counter, java_calls, all_calls = traverse_call_graph(
-            method, call_counter, "", "", True
+            method, call_counter, "", "", 0, args.max_depth
         )
         java_call_count = count_java_calls(call_counter)
 
@@ -259,7 +261,7 @@ if __name__ == "__main__":
             print(
                 f"    Analyzing trace {method['index']} FQN: {class_name} : {method_name}"
             )
-            print(f"        Method makes {java_call_count} calls to java:{all_calls}")
+            print(f"        Method makes {java_call_count} calls to java:{java_calls}")
 
         if args.source_path:
             search_root = args.source_path
@@ -298,7 +300,8 @@ if __name__ == "__main__":
             "java_calls": java_calls,
             "java_call_count": java_call_count,
             "nonjava_call_count": sum(call_counter.values()) - java_call_count,
-            "heuristic_path": str(heuristic_path),
+            "heuristic_source_path": str(heuristic_path),
+            "heuristic_suite_path": str(heuristic_suite_path)
         }
 
         for event in method["method_events"]:
@@ -364,6 +367,7 @@ if __name__ == "__main__":
     # -------------------- END OF THE MONSTER LOOP ------------------
 
     df = pd.DataFrame.from_records(method_dicts)
+    os.makedirs("parquets", exist_ok=True)
     df.to_parquet(f"parquets/{file_stem}.parquet")
 
 
