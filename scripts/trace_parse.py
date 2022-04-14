@@ -84,7 +84,7 @@ def get_core_methods(path, test_path, index_traces=True):
             del data
     for key, data in indexed_traces.items():  # this is the number of traces
         class_name = data["class_name"]
-        method_name = data["method_name"]
+        method_name = data["method_name"].lower()
 
         # Heuristically detect test case entries.
         is_test_class = "test" in class_name.lower()
@@ -92,11 +92,12 @@ def get_core_methods(path, test_path, index_traces=True):
         #if is_junit_class:
         #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
-        is_test_case = is_test_class and method_name.startswith("test") # we could skip junit classes too
-
+        is_test_case = is_test_class and (method_name.startswith("test") or method_name.startswith("when"))# we could skip junit classes too
+        if is_test_case:
+            print(class_name + '.' + method_name)
         # Skip methods that don't belong to either category of interest.
         if not is_test_case and not fanout:
-            # print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
+            #print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
             continue
 
         # For all other cases, we now track the "fan-out" set of methods called to keep track of the call tree.
@@ -104,23 +105,28 @@ def get_core_methods(path, test_path, index_traces=True):
         new_method_calls = [
             event for event in data["method_events"] if isinstance(event, int)
         ]
+        print(event for event in data["method_events"])
 
         # First, check if we have just entered a new test case.
         if not fanout:
             # We must have arrived here from a test method.
             fanout = set(new_method_calls)
+            print("fanout created")
+            print(fanout)
         else:
             if data["index"] not in fanout:
                 raise ValueError("Index not found in fan-out!", data["index"])
             # Remove the current call and add fan-out based on whether this is a test or core.
             fanout.remove(data["index"])
             fanout.update(new_method_calls)
+            print("updated fanout")
 
         # Yield only non-test methods.
         if (
-            not is_test_class and not is_junit_class
+            not is_test_class or True
         ):  # Focus on test classes to exclude calls from test cases to other test util functions.
             # pass
+            print("found method")
             yield data
 
 
