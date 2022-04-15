@@ -40,7 +40,8 @@ def get_core_methods(path, test_path, index_traces=True):
     # once we have seen its entire execution.
     fanout = set()
     line_ix = 0
-    suite_name = path.name.replace("_", "/").split("/")[:-1]
+    suite_name = path.name.replace("_", "/").split("/")
+    suite_name[-1] = suite_name[-1].partition('.')[0]
     if test_path:
         search_root = test_path
     else:
@@ -56,6 +57,7 @@ def get_core_methods(path, test_path, index_traces=True):
     try:
         size = os.path.getsize(heuristic_suite_path)
     except FileNotFoundError:
+        print(suite_name)
         print(f"{heuristic_suite_path} SUITE NOT FOUND!")
         # continue
     print(
@@ -83,19 +85,20 @@ def get_core_methods(path, test_path, index_traces=True):
             del data
     for key, data in indexed_traces.items():  # this is the number of traces
         class_name = data["class_name"]
-        method_name = data["method_name"]
+        method_name = data["method_name"].lower()
 
         # Heuristically detect test case entries.
         is_test_class = "test" in class_name.lower()
         is_junit_class = "junit" in class_name.lower()
-        if is_junit_class:
-            print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
+        #if is_junit_class:
+        #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
-        is_test_case = is_test_class and method_name.startswith("test") # we could skip junit classes too
-
+        is_test_case = is_test_class and (method_name.startswith("test") or method_name.startswith("when"))# we could skip junit classes too
+        if is_test_case:
+            print(class_name + '.' + method_name)
         # Skip methods that don't belong to either category of interest.
         if not is_test_case and not fanout:
-            # print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
+            #print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
             continue
 
         # For all other cases, we now track the "fan-out" set of methods called to keep track of the call tree.
@@ -103,23 +106,28 @@ def get_core_methods(path, test_path, index_traces=True):
         new_method_calls = [
             event for event in data["method_events"] if isinstance(event, int)
         ]
+        print(event for event in data["method_events"])
 
         # First, check if we have just entered a new test case.
         if not fanout:
             # We must have arrived here from a test method.
             fanout = set(new_method_calls)
+            print("fanout created")
+            print(fanout)
         else:
             if data["index"] not in fanout:
                 raise ValueError("Index not found in fan-out!", data["index"])
             # Remove the current call and add fan-out based on whether this is a test or core.
             fanout.remove(data["index"])
             fanout.update(new_method_calls)
+            print("updated fanout")
 
         # Yield only non-test methods.
         if (
-            not is_test_class
+            not is_test_class or True
         ):  # Focus on test classes to exclude calls from test cases to other test util functions.
             # pass
+            print("found method")
             yield data
 
 
@@ -157,6 +165,7 @@ def traverse_call_graph(
     depth += 1
     for event in trace["method_events"]:
         if type(event) is int:
+            continue
             if event in indexed_traces:
                 call_counter_child, java_calls_child, all_calls_child = traverse_call_graph(
                     indexed_traces[event], call_counter, java_calls, all_calls, depth, max_depth
