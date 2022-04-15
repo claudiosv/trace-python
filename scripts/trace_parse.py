@@ -1,6 +1,7 @@
 import argparse
 import gzip
-import json
+# import json
+import orjson as json
 
 # import glob
 import os
