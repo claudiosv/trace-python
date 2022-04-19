@@ -85,7 +85,7 @@ def get_core_methods(path, test_path, index_traces=True):
             del data
     for key, data in indexed_traces.items():  # this is the number of traces
         class_name = data["class_name"]
-        method_name = data["method_name"].lower()
+        method_name = data["method_name"]
 
         # Heuristically detect test case entries.
         is_test_class = "test" in class_name.lower()
@@ -93,7 +93,7 @@ def get_core_methods(path, test_path, index_traces=True):
         #if is_junit_class:
         #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
-        is_test_case = is_test_class and (method_name.startswith("test") or method_name.startswith("when"))# we could skip junit classes too
+        is_test_case = is_test_class and (method_name.lower().contains("test") or method_name.lower().contains("when"))# we could skip junit classes too
         if is_test_case:
             print(class_name + '.' + method_name)
         # Skip methods that don't belong to either category of interest.
