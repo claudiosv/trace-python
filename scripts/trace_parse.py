@@ -40,7 +40,7 @@ def get_core_methods(path, test_path, index_traces=True):
     # once we have seen its entire execution.
     fanout = set()
     line_ix = 0
-    suite_name = path.name.replace("_", "/").split("/")
+    suite_name = path.name.replace("_", "/").split("/")[:-1]
     suite_name[-1] = suite_name[-1].partition('.')[0]
     if test_path:
         search_root = test_path
@@ -50,7 +50,7 @@ def get_core_methods(path, test_path, index_traces=True):
             / "test"
             / "java")
     heuristic_suite_path = (
-        search_root / ("/".join(suite_name))
+        search_root / ("/".join(suite_name) + ".java")
     )
 
     size = 0
@@ -61,7 +61,8 @@ def get_core_methods(path, test_path, index_traces=True):
         print(f"{heuristic_suite_path} SUITE NOT FOUND!")
         # continue
     print(
-        f"Opening dump of {('.'.join(suite_name) + '.java')} (size: {size}) from {path}:"
+                f"Opening dump of Java test suite {'.'.join(suite_name)} (size: {size}) from {path}:"
+
     )
     with gzip.open(path, "rt") as f:
         for line in f:
