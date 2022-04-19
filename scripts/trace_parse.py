@@ -50,7 +50,7 @@ def get_core_methods(path, test_path, index_traces=True):
             / "test"
             / "java")
     heuristic_suite_path = (
-        search_root / ("/".join(suite_name) + ".java")
+        search_root / ("/".join(suite_name))
     )
 
     size = 0
@@ -240,6 +240,7 @@ if __name__ == "__main__":
     file_name = Path(args.path)
     file_stem = file_name.stem
     if os.path.getsize(file_name) < 1:
+        print("File size invalid!!!", file_name)
         exit()
     # source_path = Path()
     files = {}
