@@ -2,3 +2,5 @@
 .DS_Store
 datasets/
 pickles/
+parquets/
+parquet*

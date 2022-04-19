@@ -86,6 +86,8 @@ def get_core_methods(path, test_path, index_traces=True):
     for key, data in indexed_traces.items():  # this is the number of traces
         class_name = data["class_name"]
         method_name = data["method_name"]
+        class_name_lower = class_name.lower()
+        method_name_lower = method_name.lower()
 
         # Heuristically detect test case entries.
         is_test_class = "test" in class_name.lower()
@@ -93,7 +95,7 @@ def get_core_methods(path, test_path, index_traces=True):
         #if is_junit_class:
         #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
-        is_test_case = is_test_class and (method_name.lower().contains("test") or method_name.lower().contains("when"))# we could skip junit classes too
+        is_test_case = is_test_class and ("test" in method_name_lower or "test" in method_name_lower)# we could skip junit classes too
         if is_test_case:
             print(class_name + '.' + method_name)
         # Skip methods that don't belong to either category of interest.
@@ -165,7 +167,6 @@ def traverse_call_graph(
     depth += 1
     for event in trace["method_events"]:
         if type(event) is int:
-            continue
             if event in indexed_traces:
                 call_counter_child, java_calls_child, all_calls_child = traverse_call_graph(
                     indexed_traces[event], call_counter, java_calls, all_calls, depth, max_depth
