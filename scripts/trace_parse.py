@@ -109,28 +109,23 @@ def get_core_methods(path, test_path, index_traces=True):
         new_method_calls = [
             event for event in data["method_events"] if isinstance(event, int)
         ]
-        print(event for event in data["method_events"])
 
         # First, check if we have just entered a new test case.
         if not fanout:
             # We must have arrived here from a test method.
             fanout = set(new_method_calls)
-            print("fanout created")
-            print(fanout)
         else:
             if data["index"] not in fanout:
                 raise ValueError("Index not found in fan-out!", data["index"])
             # Remove the current call and add fan-out based on whether this is a test or core.
             fanout.remove(data["index"])
             fanout.update(new_method_calls)
-            print("updated fanout")
 
         # Yield only non-test methods.
         if (
             not is_test_class or True
         ):  # Focus on test classes to exclude calls from test cases to other test util functions.
             # pass
-            print("found method")
             yield data
 
 
