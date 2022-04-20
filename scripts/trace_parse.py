@@ -91,14 +91,14 @@ def get_core_methods(path, test_path, index_traces=True):
         method_name_lower = method_name.lower()
 
         # Heuristically detect test case entries.
-        is_test_class = "test" in class_name.lower()
-        is_junit_class = "junit" in class_name.lower()
+        is_test_class = "test" in class_name_lower
+        is_junit_class = "junit" in class_name_lower
         #if is_junit_class:
         #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
-        is_test_case = is_test_class and ("test" in method_name_lower or "test" in method_name_lower)# we could skip junit classes too
+        is_test_case = is_test_class and ("test" in method_name_lower or "when" in method_name_lower)# we could skip junit classes too
         if is_test_case:
-            print(class_name + '.' + method_name)
+            print("Test case found: ", class_name + '.' + method_name)
         # Skip methods that don't belong to either category of interest.
         if not is_test_case and not fanout:
             #print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
