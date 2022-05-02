@@ -123,7 +123,7 @@ def get_core_methods(path, test_path, index_traces=True):
 
         # Yield only non-test methods.
         if (
-            not is_test_class or True
+            not is_test_class
         ):  # Focus on test classes to exclude calls from test cases to other test util functions.
             # pass
             yield data
