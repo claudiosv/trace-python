@@ -1,7 +1,7 @@
 import argparse
 import gzip
-# import json
-import orjson as json
+import json
+# import orjson as json
 
 # import glob
 import os
@@ -68,22 +68,23 @@ def get_core_methods(path, test_path, index_traces=True):
         for line in f:
             line_ix += 1
             try:
-                data = json.loads(line.rstrip())
+                json_line = json.loads(line.rstrip())
             except:
                 print("JSON error? line", line_ix, "of file", path)
                 continue
-            indexed_traces[data["index"]] = {
-                "index": data["index"],
-                "class_name": data["class_name"],
-                "method_name": data["method_name"],
+            indexed_traces[json_line["index"]] = {
+                "index": json_line["index"],
+                "class_name": json_line["class_name"],
+                "method_name": json_line["method_name"],
                 "method_events": [
                     clean_event(e)
-                    for e in data["method_events"]
+                    for e in json_line["method_events"]
                     if isinstance(e, int)
                     or e["event_kind"] in ["method_entry", "method_call", "method_exit"]
                 ],
             }
-            del data
+            json_line = None
+            del json_line
     for key, data in indexed_traces.items():  # this is the number of traces
         class_name = data["class_name"]
         method_name = data["method_name"]
