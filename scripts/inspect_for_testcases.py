@@ -42,7 +42,7 @@ def get_core_methods(path):
             # First, check if we have just entered a new test case.
             if not fanout:
                 # We must have arrived here from a test method.
-                print("  Test:", method_name)
+                print("  Test:", class_name, method_name)
                 fanout = set(new_method_calls)
             else:
                 if data["index"] not in fanout:
@@ -65,3 +65,4 @@ def main():
     methods = get_core_methods(args.in_file)
     for m in methods:
         print("Got test method: ", m["class_name"], "#", m["method_name"])
+main()
