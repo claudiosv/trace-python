@@ -345,6 +345,7 @@ if __name__ == "__main__":
     # -------------------- END OF THE MONSTER LOOP ------------------
     if any_core_methods:
         df = pd.DataFrame.from_records(method_dicts)
+        del method_dicts
         df["test_suite"] = df["test_suite"].astype(pd.StringDtype())
         df["class_name"] = df["class_name"].astype(pd.StringDtype())
         df["just_class_name"] = df["just_class_name"].astype(pd.StringDtype())
