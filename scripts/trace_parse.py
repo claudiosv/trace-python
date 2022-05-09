@@ -162,7 +162,12 @@ def traverse_call_graph(
     if depth > max_depth and not max_depth == -1:
         return (depth, java_calls, call_counter)
     depth += 1
+    event_max = 10 
+    event_cnt = 0
     for event in trace["method_events"]:
+        if event_cnt > event_max:
+            break
+        event_cnt += 1
         # We hit a reference to another trace
         if type(event) is int:
             if event in indexed_traces:
@@ -355,8 +360,13 @@ if __name__ == "__main__":
     # -------------------- END OF THE MONSTER LOOP ------------------
     if any_core_methods:
         df = pd.DataFrame.from_records(method_dicts)
+        df['java_calls'] = df['java_calls'].astype(pd.StringDtype())
+        print(df.info())
+        print(df.dtypes)
+        print(df.info(memory_usage="deep"))
         os.makedirs("parquets", exist_ok=True)
-        df.to_parquet(f"parquets/{file_stem}.parquet")
+        #df.to_parquet(f"parquets/{file_stem}.parquet", engine='pyarrow')
+        df.to_pickle(f"parquets/{file_stem}.gz")
     else:
         print("Warning: Not a single core method was encountered")
 
