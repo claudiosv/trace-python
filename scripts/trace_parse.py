@@ -160,6 +160,8 @@ def iterate_method_calls(method_events: dict) -> Tuple[str, int]:
     java_calls = ""
     call_counter = 0
     for event in method_events:
+        if type(event) is int:
+            continue
         if event_cnt > event_max:
             break
         event_cnt += 1
