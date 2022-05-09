@@ -348,7 +348,9 @@ if __name__ == "__main__":
         del method_dicts
         df["test_suite"] = df["test_suite"].astype(pd.StringDtype())
         df["class_name"] = df["class_name"].astype(pd.StringDtype())
+        df["method_name"] = df["method_name"].astype(pd.StringDtype())
         df["just_class_name"] = df["just_class_name"].astype(pd.StringDtype())
+        df["just_method_name"] = df["just_method_name"].astype(pd.StringDtype())
         df["anonymous_classes"] = df["anonymous_classes"].astype(pd.StringDtype())
         df["anonymous_methods"] = df["anonymous_methods"].astype(pd.StringDtype())
         df["source_code"] = df["source_code"].astype(pd.StringDtype())
