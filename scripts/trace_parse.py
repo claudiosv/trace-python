@@ -345,7 +345,16 @@ if __name__ == "__main__":
     # -------------------- END OF THE MONSTER LOOP ------------------
     if any_core_methods:
         df = pd.DataFrame.from_records(method_dicts)
+        df["test_suite"] = df["test_suite"].astype(pd.StringDtype())
+        df["class_name"] = df["class_name"].astype(pd.StringDtype())
+        df["just_class_name"] = df["just_class_name"].astype(pd.StringDtype())
+        df["anonymous_classes"] = df["anonymous_classes"].astype(pd.StringDtype())
+        df["anonymous_methods"] = df["anonymous_methods"].astype(pd.StringDtype())
+        df["source_code"] = df["source_code"].astype(pd.StringDtype())
+        df["notes"] = df["notes"].astype(pd.StringDtype())
         df["java_calls"] = df["java_calls"].astype(pd.StringDtype())
+        df["heuristic_source_path"] = df["heuristic_source_path"].astype(pd.StringDtype())
+        df["heuristic_suite_path"] = df["heuristic_suite_path"].astype(pd.StringDtype())
         print(df.info())
         print(df.dtypes)
         print(df.info(memory_usage="deep"))
