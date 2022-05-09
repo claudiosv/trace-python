@@ -158,6 +158,7 @@ def iterate_method_calls(method_events: dict) -> Tuple[str, int]:
     event_max = 200
     event_cnt = 0
     java_calls = ""
+    call_counter = 0
     for event in method_events:
         if event_cnt > event_max:
             break
