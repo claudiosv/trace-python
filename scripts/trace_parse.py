@@ -1,6 +1,7 @@
 import argparse
 import gzip
 import json
+
 # import orjson as json
 
 # import glob
@@ -15,7 +16,8 @@ from typing import List, Tuple
 
 indexed_traces = {}  # dump: []
 
-heuristic_suite_path = ''
+heuristic_suite_path = ""
+
 
 def clean_event(event):
     if isinstance(event, int):
@@ -41,17 +43,12 @@ def get_core_methods(path, test_path, index_traces=True):
     fanout = set()
     line_ix = 0
     suite_name = path.name.replace("_", "/").split("/")[:-1]
-    suite_name[-1] = suite_name[-1].partition('.')[0]
+    suite_name[-1] = suite_name[-1].partition(".")[0]
     if test_path:
         search_root = test_path
     else:
-        search_root = (path.parents[1]
-            / "src"
-            / "test"
-            / "java")
-    heuristic_suite_path = (
-        search_root / ("/".join(suite_name) + ".java")
-    )
+        search_root = path.parents[1] / "src" / "test" / "java"
+    heuristic_suite_path = search_root / ("/".join(suite_name) + ".java")
 
     size = 0
     try:
@@ -61,8 +58,7 @@ def get_core_methods(path, test_path, index_traces=True):
         print(f"{heuristic_suite_path} SUITE NOT FOUND!")
         # continue
     print(
-                f"Opening dump of Java test suite {'.'.join(suite_name)} (size: {size}) from {path}:"
-
+        f"Opening dump of Java test suite {'.'.join(suite_name)} (size: {size}) from {path}:"
     )
     with gzip.open(path, "rt") as f:
         for line in f:
@@ -94,15 +90,17 @@ def get_core_methods(path, test_path, index_traces=True):
         # Heuristically detect test case entries.
         is_test_class = "test" in class_name_lower
         is_junit_class = "junit" in class_name_lower
-        #if is_junit_class:
+        # if is_junit_class:
         #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
-        is_test_case = is_test_class and ("test" in method_name_lower or "when" in method_name_lower)# we could skip junit classes too
+        is_test_case = is_test_class and (
+            "test" in method_name_lower or "when" in method_name_lower
+        )  # we could skip junit classes too
         if is_test_case:
-            print("Test case found: ", class_name + '.' + method_name)
+            print("Test case found: ", class_name + "." + method_name)
         # Skip methods that don't belong to either category of interest.
         if not is_test_case and not fanout:
-            #print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
+            # print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
             continue
 
         # For all other cases, we now track the "fan-out" set of methods called to keep track of the call tree.
@@ -156,44 +154,28 @@ def method_entry_to_debug_str(
     return method_repr
 
 
-def traverse_call_graph(
-    trace: dict, call_counter: int, java_calls: str, depth: int, max_depth: int
-) -> Tuple[int, str, int]:  # counter of calls, java_calls, all_calls
-    if depth > max_depth and not max_depth == -1:
-        return (depth, java_calls, call_counter)
-    depth += 1
-    event_max = 10 
+def iterate_method_calls(method_events: dict) -> Tuple[str, int]:
+    event_max = 200
     event_cnt = 0
-    for event in trace["method_events"]:
+    for event in method_events:
         if event_cnt > event_max:
             break
         event_cnt += 1
-        # We hit a reference to another trace
-        if type(event) is int:
-            if event in indexed_traces:
-                depth, java_calls_child, call_counter = traverse_call_graph(
-                    indexed_traces[event], call_counter, java_calls, depth, max_depth
-                )
-                java_calls += java_calls_child
-        # The trace terminates here
-        else:
-            e_k = event["event_kind"]
-            method_class = trace["class_name"]
-            method_name = trace["method_name"]
-            if e_k == "method_call":
-                called_class_name = event.get("called_class_name", "Unknown")
-                called_method_name = event.get("called_method_name", "Unknown")
+        e_k = event["event_kind"]
+        if e_k == "method_call":
+            called_class_name = event.get("called_class_name", "Unknown")
+            called_method_name = event.get("called_method_name", "Unknown")
 
-                if called_class_name.startswith("java."):
-                    method_call_repr = method_call_to_debug_str(
-                        called_class_name,
-                        called_method_name,
-                        event.get("parameter_types", [""]),
-                        event.get("return_type", "void"),
-                    )
-                    java_calls += method_call_repr
-                    call_counter += 1
-    return (depth, java_calls, call_counter)
+            if called_class_name.startswith("java."):
+                method_call_repr = method_call_to_debug_str(
+                    called_class_name,
+                    called_method_name,
+                    event.get("parameter_types", [""]),
+                    event.get("return_type", "void"),
+                )
+                java_calls += method_call_repr
+                call_counter += 1
+    return (java_calls, call_counter)
 
 
 def count_java_calls(call_counter: Counter) -> int:
@@ -208,7 +190,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process a gzipped trace.")
     parser.add_argument("--source_path", metavar="Path", type=Path, required=False)
     parser.add_argument("--test_path", metavar="Path", type=Path, required=False)
-    parser.add_argument("--show_source", type=bool, action=argparse.BooleanOptionalAction)
+    parser.add_argument(
+        "--show_source", type=bool, action=argparse.BooleanOptionalAction
+    )
     parser.add_argument("--verbose", type=bool, action=argparse.BooleanOptionalAction)
     parser.add_argument("--max_depth", type=int)
     parser.add_argument("path", metavar="Path", type=Path)
@@ -239,12 +223,9 @@ if __name__ == "__main__":
         just_method_name = method_name.partition("$")[0]
         anonymous_classes = class_name.split("$")[1:]
         anonymous_methods = method_name.split("$")[1:]
-        call_counter = 0
-        depth = 0
-        depth, java_calls, java_call_count = traverse_call_graph(
-            method, call_counter, "", 0, args.max_depth
+        java_calls, java_call_count = iterate_method_calls(
+            method.get("method_events", [])
         )
-        # java_call_count = count_java_calls(call_counter)
 
         if args.verbose:
             print(
@@ -255,13 +236,9 @@ if __name__ == "__main__":
         if args.source_path:
             search_root = args.source_path
         else:
-            search_root = (file_name.parents[1]
-            / "src"
-            / "main"
-            / "java")
-        heuristic_path = (
-            search_root
-            / (class_name.replace(".", "/").partition("$")[0] + ".java")
+            search_root = file_name.parents[1] / "src" / "main" / "java"
+        heuristic_path = search_root / (
+            class_name.replace(".", "/").partition("$")[0] + ".java"
         )
         size = 0
         skip_file = False
@@ -290,9 +267,8 @@ if __name__ == "__main__":
             "all_calls": "",
             "java_calls": java_calls,
             "java_call_count": java_call_count,
-            "maxdepth": depth, #sum(call_counter.values()) - java_call_count,
             "heuristic_source_path": str(heuristic_path),
-            "heuristic_suite_path": str(heuristic_suite_path)
+            "heuristic_suite_path": str(heuristic_suite_path),
         }
 
         for event in method["method_events"]:
@@ -319,7 +295,7 @@ if __name__ == "__main__":
                             else:
                                 print(f"        One liner ({line_numbers})")
                             print(f"        Source snippet:")
-                        if not(skip_file or size<1):
+                        if not (skip_file or size < 1):
                             sed_1 = subprocess.Popen(
                                 (
                                     "sed",
@@ -334,7 +310,12 @@ if __name__ == "__main__":
                                 stdout=subprocess.PIPE,
                             )
                             grep = subprocess.run(
-                                ("grep", "--color=always", "-E", f"(^({line_regex}).*)|^"),
+                                (
+                                    "grep",
+                                    "--color=always",
+                                    "-E",
+                                    f"(^({line_regex}).*)|^",
+                                ),
                                 check=False,
                                 stdin=sed_2.stdout,
                                 text=True,
@@ -346,7 +327,9 @@ if __name__ == "__main__":
                                 print(grep.stdout)
                             method_dict_template["source_code"] = grep.stdout
                         else:
-                            method_dict_template["notes"] += "Couldn't find source code heuristically"
+                            method_dict_template[
+                                "notes"
+                            ] += "Couldn't find source code heuristically"
                     else:
                         print(f"Heuristic source: {heuristic_path}")
                         print("         Something went wrong! 1")
@@ -360,12 +343,12 @@ if __name__ == "__main__":
     # -------------------- END OF THE MONSTER LOOP ------------------
     if any_core_methods:
         df = pd.DataFrame.from_records(method_dicts)
-        df['java_calls'] = df['java_calls'].astype(pd.StringDtype())
+        df["java_calls"] = df["java_calls"].astype(pd.StringDtype())
         print(df.info())
         print(df.dtypes)
         print(df.info(memory_usage="deep"))
         os.makedirs("parquets", exist_ok=True)
-        #df.to_parquet(f"parquets/{file_stem}.parquet", engine='pyarrow')
+        # df.to_parquet(f"parquets/{file_stem}.parquet", engine='pyarrow')
         df.to_pickle(f"parquets/{file_stem}.gz")
     else:
         print("Warning: Not a single core method was encountered")
