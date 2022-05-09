@@ -157,6 +157,7 @@ def method_entry_to_debug_str(
 def iterate_method_calls(method_events: dict) -> Tuple[str, int]:
     event_max = 200
     event_cnt = 0
+    java_calls = ""
     for event in method_events:
         if event_cnt > event_max:
             break
@@ -216,7 +217,6 @@ if __name__ == "__main__":
     any_core_methods = False
     for method in get_core_methods(file_name, args.test_path):
         any_core_methods = True
-        java_calls = ""
         class_name = method["class_name"]
         method_name = method["method_name"]
         just_class_name = class_name.rpartition(".")[-1]
