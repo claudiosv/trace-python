@@ -142,34 +142,44 @@ generate_project_report() {
     basename=$(basename "$proj")
     echo "$basename"
     failed_txt=$(find "$proj" -name FAILED.txt | wc -l)
-	printf "FAILED.txt: %d\n" "$failed_txt"
+	# printf "FAILED.txt: %d\n" "$failed_txt"
 
     build_fail=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)
-	printf "Build failure: %d\n" "$build_fail"
+	# printf "Build failure: %d\n" "$build_fail"
 
     build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
-	printf "Build success: %d\n" "$build_success"
+	# printf "Build success: %d\n" "$build_success"
+
+    mvn_ran=$(find "$proj" -name "mvn_*" | wc -l)
+	# printf "Mvn runs: %d\n" "$mvn_ran"
+
+    testsuite_run=$(find "$proj/logs_X4PmlaxV" | wc -l)
+	# printf "Testsuite runs: %d\n" "$testsuite_run"
+
+    build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
+	# printf "Build success: %d\n" "$build_success"
 
     tests_run=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | wc -l)
-	printf "Tests run: %d\n" "$tests_run"
+	# printf "Tests run: %d\n" "$tests_run"
 
     test_sum=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} pcre2grep -o1 "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | awk '{s+=$1} END {print s}')
-	printf "Tests run sum: %d\n" "$test_sum"
+	# printf "Tests run sum: %d\n" "$test_sum"
 
     instrumented=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i "Enabling instrumentation" {} | wc -l)
-	printf "Enabling instrumentation: %d\n" "$instrumented"
+	# printf "Enabling instrumentation: %d\n" "$instrumented"
 
     test_instrumented=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i -m1 "Instrumenting: .*Test$" {} | wc -l)
-	printf "Test instrumented: %d\n" "$test_instrumented"
+	# printf "Test instrumented: %d\n" "$test_instrumented"
 
     gzips=$(find "$proj" -name "*java.gz" | wc -l)
-	printf "Gzips produced: %d\n" "$gzips"
+	# printf "Gzips produced: %d\n" "$gzips"
 
     files=$(find "$proj" -iname "*test*.java" -type f | wc -l)
     test_cases_raw=$(find "$proj" -iname "*test*.java" -type f -print0 | xargs -0 -I% grep -i -o @Test "%" | sort | uniq -c | sort -nr | awk '{s+=$1} END {print s}')
-    printf "Test suites heuristic: %d\n" "$files"
-    printf "Test cases heuristic: %d\n" "$test_cases_raw"
-    echo "---------------"
+    # printf "Test suites heuristic: %d\n" "$files"
+    # printf "Test cases heuristic: %d\n" "$test_cases_raw"
+    # echo "---------------"
+    printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run"
 }
 
 find_class_loader_corruptions() {
@@ -185,6 +195,7 @@ backup_dumps()
 
 case "$1" in
   "projreport")
+    echo ""
     for PROJ in /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections
     do
         generate_project_report $PROJ
