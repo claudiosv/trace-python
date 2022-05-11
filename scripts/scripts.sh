@@ -195,7 +195,7 @@ backup_dumps()
 
 case "$1" in
   "projreport")
-    echo ""
+    echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run"
     for PROJ in /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections
     do
         generate_project_report $PROJ
