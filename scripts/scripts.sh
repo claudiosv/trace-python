@@ -141,14 +141,30 @@ generate_project_report() {
     proj="$1"
     basename=$(basename "$proj")
     echo "$basename"
-    echo "FAILED.txt: $(find "$proj" -name FAILED.txt | wc -l)"
-    echo "Build failure: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)"
-    echo "Build success: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)"
-    echo "Tests run: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | wc -l)"
-    echo "Tests run sum: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | awk '{s+=$1} END {print s}')"
-    echo "Enabling instrumentation: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i "Enabling instrumentation" {} | wc -l)"
-    echo "Test instrumented: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i -m1 "Instrumenting: .*Test$" {} | wc -l)"
-    echo "Gzips produced: $(find "$proj" -name "*java.gz" | wc -l)"
+    failed_txt=$(find "$proj" -name FAILED.txt | wc -l)
+	printf "FAILED.txt: %d\n" "$failed_txt"
+
+    build_fail=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)
+	print "Build failure: %d\n" "$build_fail"
+
+    build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
+	printf "Build success: %d\n" "$build_success"
+
+    tests_run=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | wc -l)
+	printf "Tests run: %d\n" "$tests_run"
+
+    test_sum=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} pcre2grep -o1 "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | awk '{s+=$1} END {print s}')
+	printf "Tests run sum: %d\n" "$test_sum"
+
+    instrumented=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i "Enabling instrumentation" {} | wc -l)
+	printf "Enabling instrumentation: %d\n" "$instrumented"
+
+    test_instrumented=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i -m1 "Instrumenting: .*Test$" {} | wc -l)
+	printf "Test instrumented: %d\n" "$test_instrumented"
+
+    gzips=$(find "$proj" -name "*java.gz" | wc -l)
+	printf "Gzips produced: %d\n" "$gzips"
+
     files=$(find "$proj" -iname "*test*.java" -type f | wc -l)
     test_cases_raw=$(find "$proj" -iname "*test*.java" -type f -print0 | xargs -0 -I% grep -i -o @Test "%" | sort | uniq -c | sort -nr | awk '{s+=$1} END {print s}')
     printf "Test suites heuristic: %d\n" "$files"
