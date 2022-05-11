@@ -123,6 +123,7 @@ generate_log_report() {
 
 generate_project_report() {
     proj="$1"
+    echo "$proj"
     echo "FAILED.txt: $(find "$proj" -name FAILED.txt | wc -l)"
     echo "Build failure: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)"
     echo "Build success: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)"
