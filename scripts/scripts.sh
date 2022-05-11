@@ -140,7 +140,7 @@ generate_log_report() {
 generate_project_report() {
     proj="$1"
     basename=$(basename "$proj")
-    echo "$basename"
+    # echo "$basename"
     failed_txt=$(find "$proj" -name FAILED.txt | wc -l)
 	# printf "FAILED.txt: %d\n" "$failed_txt"
 
