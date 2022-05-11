@@ -20,11 +20,27 @@ find_instrumented_dumps() {
         xargs -I% -n1 sh -c 'ls -Sr % 1>>/home/claudios/resolved_202205111816.txt 2>>/home/claudios/unresolved_202205111816.txt'
 }
 
+find_instrumented_dumps_and_parse() {
+    find /ssd/claudios/projects -name "mvn_*" -print0 |
+        xargs -0 -P8 -I{} pcre2grep -o1 -H "Instrumenting: .*((Test.*)|(.*Test)|(.*Tests)|(.*TestCase))$" {} |
+        sed -E "s/mvn_log_.*$/\*\_java.gz/" |
+        sort -u |
+        xargs -I% -n1 sh -c 'ls -Sr % 2>>/home/claudios/unresolved_202205111816.txt' |
+        parallel --progress -N1 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt) 2>parse_logs/\$(basename {})_errors.log"
+}
+
 parse_dumps() {
     find /ssd/claudios/projects -name "*java.gz" -size +33c -printf '%s\t%p\n' |
         sort -nr |
         cut -f2- |
         xargs -P2 -n1 -I{} sh -c "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt)" 2>parse_logs_errors1.log
+}
+
+parse_dumps_parallel() {
+    find /ssd/claudios/projects -name "*java.gz" -size +33c -printf '%s\t%p\n' |
+        sort -nr |
+        cut -f2- |
+        parallel --progress -N1 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt)" 2>parse_logs_errors1.log
 }
 
 parse_netty_dumps() {
@@ -123,7 +139,8 @@ generate_log_report() {
 
 generate_project_report() {
     proj="$1"
-    echo "$proj"
+    basename=$(basename "$proj")
+    echo "$basename"
     echo "FAILED.txt: $(find "$proj" -name FAILED.txt | wc -l)"
     echo "Build failure: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)"
     echo "Build success: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)"
@@ -132,6 +149,10 @@ generate_project_report() {
     echo "Enabling instrumentation: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i "Enabling instrumentation" {} | wc -l)"
     echo "Test instrumented: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i -m1 "Instrumenting: .*Test$" {} | wc -l)"
     echo "Gzips produced: $(find "$proj" -name "*java.gz" | wc -l)"
+    files=$(find "$proj" -iname "*test*.java" -type f | wc -l)
+    test_cases_raw=$(find "$proj" -iname "*test*.java" -type f -print0 | xargs -0 -I% grep -i -o @Test "%" | sort | uniq -c | sort -nr | awk '{s+=$1} END {print s}')
+    printf "Test suites heuristic: %d\n" "$files"
+    printf "Test cases heuristic: %d\n" "$test_cases_raw"
     echo "---------------"
 }
 
@@ -158,3 +179,5 @@ case "$1" in
     exit 1
     ;;
 esac
+
+parallel --pipe -N1 --null echo {}
