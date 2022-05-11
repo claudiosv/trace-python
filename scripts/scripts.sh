@@ -122,14 +122,16 @@ generate_log_report() {
 }
 
 generate_project_report() {
-    proj="/home/claudios/projects/eugenp_tutorials"
-    echo "FAILED.txt: $(find $proj -name FAILED.txt | wc -l)"
-    echo "Build failure: $(find $proj -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)"
-    echo "Build success: $(find $proj -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)"
-    echo "Tests run: $(find $proj -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | wc -l)"
-    echo "Tests run sum: $(find $proj -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | awk '{s+=$1} END {print s}')"
-    echo "Enabling instrumentation: $(find $proj -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i "Enabling instrumentation" {} | wc -l)"
-    echo "Test instrumented: $(find $proj -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i -m1 "Instrumenting: .*Test$" {} | wc -l)"
+    proj="$1"
+    echo "FAILED.txt: $(find "$proj" -name FAILED.txt | wc -l)"
+    echo "Build failure: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)"
+    echo "Build success: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)"
+    echo "Tests run: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | wc -l)"
+    echo "Tests run sum: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | awk '{s+=$1} END {print s}')"
+    echo "Enabling instrumentation: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i "Enabling instrumentation" {} | wc -l)"
+    echo "Test instrumented: $(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i -m1 "Instrumenting: .*Test$" {} | wc -l)"
+    echo "Gzips produced: $(find "$proj" -name "*java.gz" | wc -l)"
+    echo "---------------"
 }
 
 find_class_loader_corruptions() {
@@ -142,3 +144,16 @@ backup_dumps()
 {
     sudo find /ssd/claudios/projects -name "*java.gz" -type f -exec sh -c 'mv $(dirname {})/dump-1.zip /data/claudios/dump_backups/$(dirname {})/dump-1.zip' \;
 }
+
+case "$1" in
+  "projreport")
+    for PROJ in /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections
+    do
+        generate_project_report $PROJ
+    done
+    ;;
+  *)
+    echo "You have failed to specify what to do correctly."
+    exit 1
+    ;;
+esac
