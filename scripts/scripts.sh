@@ -145,7 +145,7 @@ generate_project_report() {
 	printf "FAILED.txt: %d\n" "$failed_txt"
 
     build_fail=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)
-	print "Build failure: %d\n" "$build_fail"
+	printf "Build failure: %d\n" "$build_fail"
 
     build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
 	printf "Build success: %d\n" "$build_success"
