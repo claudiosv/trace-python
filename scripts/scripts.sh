@@ -153,7 +153,9 @@ generate_project_report() {
     mvn_ran=$(find "$proj" -name "mvn_*" | wc -l)
 	# printf "Mvn runs: %d\n" "$mvn_ran"
 
-    testsuite_run=$(find "$proj/logs_X4PmlaxV" | wc -l)
+    testsuite_run=$(find "$proj/logs_X4PmlaxV" -not -name "log_build.txt" | wc -l)
+    project_built=$(grep -c "BUILD SUCCESS" "$proj/logs_X4PmlaxV/log_build.txt")
+    project_didnt_build=$(grep -c "BUILD FAILURE" "$proj/logs_X4PmlaxV/log_build.txt")
 	# printf "Testsuite runs: %d\n" "$testsuite_run"
 
     build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
@@ -179,7 +181,7 @@ generate_project_report() {
     # printf "Test suites heuristic: %d\n" "$files"
     # printf "Test cases heuristic: %d\n" "$test_cases_raw"
     # echo "---------------"
-    printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run"
+    printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build"
 }
 
 find_class_loader_corruptions() {
@@ -195,8 +197,8 @@ backup_dumps()
 
 case "$1" in
   "projreport")
-    echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run"
-    for PROJ in /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections
+    echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run,project_built,project_didnt_build"
+    for PROJ in /ssd/claudios/projects/camel-kamelets /ssd/claudios/projects/maven-dist-tool /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/geronimo-metrics /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/incubator-kyuubi /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/spark /ssd/claudios/projects/geronimo-txmanager /ssd/claudios/projects/capella-basic-vp /ssd/claudios/projects/cxf-fediz /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections /ssd/claudios/projects/activemq /ssd/claudios/eugenp_tutorials
     do
         generate_project_report $PROJ
     done
