@@ -181,6 +181,21 @@ def iterate_method_calls(method_events: dict) -> Tuple[str, int]:
                 call_counter += 1
     return (java_calls, call_counter)
 
+def iterate_method_call_count(method_events: dict) -> int:
+    event_max = 200
+    event_cnt = 0
+    for event in method_events:
+        if type(event) is int:
+            continue
+        if event_cnt > event_max:
+            break
+        event_cnt += 1
+        e_k = event["event_kind"]
+        if e_k == "method_call":
+            called_class_name = event.get("called_class_name", "Unknown")
+            if called_class_name.startswith("java."):
+                return 1
+    return 0
 
 def count_java_calls(call_counter: Counter) -> int:
     total = 0
@@ -199,173 +214,190 @@ if __name__ == "__main__":
     )
     parser.add_argument("--verbose", type=bool, action=argparse.BooleanOptionalAction)
     parser.add_argument("--max_depth", type=int)
+    parser.add_argument("action", type=str)
     parser.add_argument("path", metavar="Path", type=Path)
 
     args = parser.parse_args()
 
-    dumps = {}
-    dump_counter = {}
-    file_name = Path(args.path)
-    file_stem = file_name.stem
-    if os.path.getsize(file_name) < 1:
-        print("File size invalid!!!", file_name)
-        exit()
-    files = {}
-    string_traces = []
-    visited = []
-    visit_counter = Counter()
-    loc_vs_calls = {}
+    if args.action == "parquet":
+        dumps = {}
+        dump_counter = {}
+        file_name = Path(args.path)
+        file_stem = file_name.stem
+        if os.path.getsize(file_name) < 1:
+            print("File size invalid!!!", file_name)
+            exit()
+        files = {}
+        string_traces = []
+        visited = []
+        visit_counter = Counter()
+        loc_vs_calls = {}
 
-    method_dicts = []
-    any_core_methods = False
-    for method in get_core_methods(file_name, args.test_path):
-        any_core_methods = True
-        class_name = method["class_name"]
-        method_name = method["method_name"]
-        just_class_name = class_name.rpartition(".")[-1]
-        just_method_name = method_name.partition("$")[0]
-        anonymous_classes = class_name.split("$")[1:]
-        anonymous_methods = method_name.split("$")[1:]
-        java_calls, java_call_count = iterate_method_calls(
-            method.get("method_events", [])
-        )
-
-        if args.verbose:
-            print(
-                f"    Analyzing trace {method['index']} FQN: {class_name} : {method_name}"
+        method_dicts = []
+        any_core_methods = False
+        for method in get_core_methods(file_name, args.test_path):
+            any_core_methods = True
+            class_name = method["class_name"]
+            method_name = method["method_name"]
+            just_class_name = class_name.rpartition(".")[-1]
+            just_method_name = method_name.partition("$")[0]
+            anonymous_classes = class_name.split("$")[1:]
+            anonymous_methods = method_name.split("$")[1:]
+            java_calls, java_call_count = iterate_method_calls(
+                method.get("method_events", [])
             )
-            print(f"        Method makes {java_call_count} calls to java:{java_calls}")
 
-        if args.source_path:
-            search_root = args.source_path
-        else:
-            search_root = file_name.parents[1] / "src" / "main" / "java"
-        heuristic_path = search_root / (
-            class_name.replace(".", "/").partition("$")[0] + ".java"
-        )
-        size = 0
-        skip_file = False
-        try:
-            size = os.path.getsize(heuristic_path)
-        except FileNotFoundError:
-            print(f"{heuristic_path} FILE NOT FOUND!")
-            print(f"{class_name}:{method_name}")
-            skip_file = True
-            # continue
+            if args.verbose:
+                print(
+                    f"    Analyzing trace {method['index']} FQN: {class_name} : {method_name}"
+                )
+                print(f"        Method makes {java_call_count} calls to java:{java_calls}")
 
-        method_dict_template = {
-            "test_suite": file_stem,  # this is the dump name
-            "index_in_dump": method["index"],
-            "class_name": class_name,
-            "method_name": method_name,
-            "just_class_name": just_class_name,
-            "just_method_name": just_method_name,
-            "anonymous_classes": anonymous_classes,
-            "anonymous_methods": anonymous_methods,
-            "source_code": "",
-            "loc_executed": 0,
-            "loc_span": 0,
-            "loc": (),
-            "notes": "",
-            "java_calls": java_calls,
-            "java_call_count": java_call_count,
-            "heuristic_source_path": str(heuristic_path),
-            "heuristic_suite_path": str(heuristic_suite_path),
-        }
+            if args.source_path:
+                search_root = args.source_path
+            else:
+                search_root = file_name.parents[1] / "src" / "main" / "java"
+            heuristic_path = search_root / (
+                class_name.replace(".", "/").partition("$")[0] + ".java"
+            )
+            size = 0
+            skip_file = False
+            try:
+                size = os.path.getsize(heuristic_path)
+            except FileNotFoundError:
+                print(f"{heuristic_path} FILE NOT FOUND!")
+                print(f"{class_name}:{method_name}")
+                skip_file = True
+                # continue
 
-        for event in method["method_events"]:
-            if not (type(event) is int):
-                if "line_numbers" in event:
-                    line_numbers = event["line_numbers"]
+            method_dict_template = {
+                "test_suite": file_stem,  # this is the dump name
+                "index_in_dump": method["index"],
+                "class_name": class_name,
+                "method_name": method_name,
+                "just_class_name": just_class_name,
+                "just_method_name": just_method_name,
+                "anonymous_classes": anonymous_classes,
+                "anonymous_methods": anonymous_methods,
+                "source_code": "",
+                "loc_executed": 0,
+                "loc_span": 0,
+                "loc": (),
+                "notes": "",
+                "java_calls": java_calls,
+                "java_call_count": java_call_count,
+                "heuristic_source_path": str(heuristic_path),
+                "heuristic_suite_path": str(heuristic_suite_path),
+            }
 
-                    if len(line_numbers) > 0:
-                        distance = max(line_numbers) - min(line_numbers)
-                        extended_line_numbers = list(map(str, line_numbers))
-                        line_regex = "|".join(extended_line_numbers)  # str(None) "None"
-                        method_dict_template["loc"] = tuple(line_numbers)
-                        method_dict_template["loc_executed"] = len(line_numbers)
-                        method_dict_template["loc_span"] = distance + 1
-                        if args.verbose:
-                            print(f"    Analyzing {event['event_kind']} event:")
-                            print(f"    Heuristic source: {heuristic_path}")
-                            print(f"        Anonymous methods: {anonymous_methods}")
-                            print(f"        Anonymous classes: {anonymous_classes}")
-                            if len(line_numbers) > 1:
-                                print(
-                                    f"        {distance+1} / {len(line_numbers)} lines ({line_numbers})"
+            for event in method["method_events"]:
+                if not (type(event) is int):
+                    if "line_numbers" in event:
+                        line_numbers = event["line_numbers"]
+
+                        if len(line_numbers) > 0:
+                            distance = max(line_numbers) - min(line_numbers)
+                            extended_line_numbers = list(map(str, line_numbers))
+                            line_regex = "|".join(extended_line_numbers)  # str(None) "None"
+                            method_dict_template["loc"] = tuple(line_numbers)
+                            method_dict_template["loc_executed"] = len(line_numbers)
+                            method_dict_template["loc_span"] = distance + 1
+                            if args.verbose:
+                                print(f"    Analyzing {event['event_kind']} event:")
+                                print(f"    Heuristic source: {heuristic_path}")
+                                print(f"        Anonymous methods: {anonymous_methods}")
+                                print(f"        Anonymous classes: {anonymous_classes}")
+                                if len(line_numbers) > 1:
+                                    print(
+                                        f"        {distance+1} / {len(line_numbers)} lines ({line_numbers})"
+                                    )
+                                else:
+                                    print(f"        One liner ({line_numbers})")
+                                print(f"        Source snippet:")
+                            if not (skip_file or size < 1):
+                                sed_1 = subprocess.Popen(
+                                    (
+                                        "sed",
+                                        f"{min(line_numbers[0], line_numbers[0]-2)},{line_numbers[-1]}!d;=",
+                                        heuristic_path,
+                                    ),
+                                    stdout=subprocess.PIPE,
                                 )
+                                sed_2 = subprocess.Popen(
+                                    ("sed", "N;s/\\n/ /"),
+                                    stdin=sed_1.stdout,
+                                    stdout=subprocess.PIPE,
+                                )
+                                grep = subprocess.run(
+                                    (
+                                        "grep",
+                                        "--color=always",
+                                        "-E",
+                                        f"(^({line_regex}).*)|^",
+                                    ),
+                                    check=False,
+                                    stdin=sed_2.stdout,
+                                    text=True,
+                                    capture_output=True,
+                                )
+                                sed_1.wait()
+                                sed_2.wait()
+                                if args.show_source:
+                                    print(grep.stdout)
+                                method_dict_template["source_code"] = grep.stdout
                             else:
-                                print(f"        One liner ({line_numbers})")
-                            print(f"        Source snippet:")
-                        if not (skip_file or size < 1):
-                            sed_1 = subprocess.Popen(
-                                (
-                                    "sed",
-                                    f"{min(line_numbers[0], line_numbers[0]-2)},{line_numbers[-1]}!d;=",
-                                    heuristic_path,
-                                ),
-                                stdout=subprocess.PIPE,
-                            )
-                            sed_2 = subprocess.Popen(
-                                ("sed", "N;s/\\n/ /"),
-                                stdin=sed_1.stdout,
-                                stdout=subprocess.PIPE,
-                            )
-                            grep = subprocess.run(
-                                (
-                                    "grep",
-                                    "--color=always",
-                                    "-E",
-                                    f"(^({line_regex}).*)|^",
-                                ),
-                                check=False,
-                                stdin=sed_2.stdout,
-                                text=True,
-                                capture_output=True,
-                            )
-                            sed_1.wait()
-                            sed_2.wait()
-                            if args.show_source:
-                                print(grep.stdout)
-                            method_dict_template["source_code"] = grep.stdout
+                                method_dict_template[
+                                    "notes"
+                                ] += "Couldn't find source code heuristically"
                         else:
-                            method_dict_template[
-                                "notes"
-                            ] += "Couldn't find source code heuristically"
-                    else:
-                        print(f"Heuristic source: {heuristic_path}")
-                        print("         Something went wrong! 1")
-                        method_dict_template["notes"] += "Couldn't find LOC event"
-                    if args.verbose:
-                        print("----------------------------\n")
-            # -- TYPE OF EVENT
-        # ----- END OF EVENT LOOP
+                            print(f"Heuristic source: {heuristic_path}")
+                            print("         Something went wrong! 1")
+                            method_dict_template["notes"] += "Couldn't find LOC event"
+                        if args.verbose:
+                            print("----------------------------\n")
+                # -- TYPE OF EVENT
+            # ----- END OF EVENT LOOP
 
-        method_dicts.append(method_dict_template)
-    # -------------------- END OF THE MONSTER LOOP ------------------
-    if any_core_methods:
-        df = pd.DataFrame.from_records(method_dicts)
-        del method_dicts
-        df["test_suite"] = df["test_suite"].astype(pd.StringDtype())
-        df["class_name"] = df["class_name"].astype(pd.StringDtype())
-        df["method_name"] = df["method_name"].astype(pd.StringDtype())
-        df["just_class_name"] = df["just_class_name"].astype(pd.StringDtype())
-        df["just_method_name"] = df["just_method_name"].astype(pd.StringDtype())
-        df["anonymous_classes"] = df["anonymous_classes"].astype(pd.StringDtype())
-        df["anonymous_methods"] = df["anonymous_methods"].astype(pd.StringDtype())
-        df["source_code"] = df["source_code"].astype(pd.StringDtype())
-        df["notes"] = df["notes"].astype(pd.StringDtype())
-        df["java_calls"] = df["java_calls"].astype(pd.StringDtype())
-        df["heuristic_source_path"] = df["heuristic_source_path"].astype(pd.StringDtype())
-        df["heuristic_suite_path"] = df["heuristic_suite_path"].astype(pd.StringDtype())
-        print(df.info())
-        print(df.dtypes)
-        print(df.info(memory_usage="deep"))
-        os.makedirs("parquets", exist_ok=True)
-        # df.to_parquet(f"parquets/{file_stem}.parquet", engine='pyarrow')
-        df.to_pickle(f"parquets/{file_stem}.gz")
-    else:
-        print("Warning: Not a single core method was encountered")
+            method_dicts.append(method_dict_template)
+        # -------------------- END OF THE MONSTER LOOP ------------------
+        if any_core_methods:
+            df = pd.DataFrame.from_records(method_dicts)
+            del method_dicts
+            df["test_suite"] = df["test_suite"].astype(pd.StringDtype())
+            df["class_name"] = df["class_name"].astype(pd.StringDtype())
+            df["method_name"] = df["method_name"].astype(pd.StringDtype())
+            df["just_class_name"] = df["just_class_name"].astype(pd.StringDtype())
+            df["just_method_name"] = df["just_method_name"].astype(pd.StringDtype())
+            df["anonymous_classes"] = df["anonymous_classes"].astype(pd.StringDtype())
+            df["anonymous_methods"] = df["anonymous_methods"].astype(pd.StringDtype())
+            df["source_code"] = df["source_code"].astype(pd.StringDtype())
+            df["notes"] = df["notes"].astype(pd.StringDtype())
+            df["java_calls"] = df["java_calls"].astype(pd.StringDtype())
+            df["heuristic_source_path"] = df["heuristic_source_path"].astype(pd.StringDtype())
+            df["heuristic_suite_path"] = df["heuristic_suite_path"].astype(pd.StringDtype())
+            print(df.info())
+            print(df.dtypes)
+            print(df.info(memory_usage="deep"))
+            os.makedirs("parquets", exist_ok=True)
+            # df.to_parquet(f"parquets/{file_stem}.parquet", engine='pyarrow')
+            df.to_pickle(f"parquets/{file_stem}.gz")
+        else:
+            print("Warning: Not a single core method was encountered")
+    elif args.action == "count":
+        file_name = Path(args.path)
+        file_stem = file_name.stem
+        if os.path.getsize(file_name) < 1:
+            print(0)
+            exit()
+
+        core_method_counter = 0
+        methods_call_java_count = 0
+        for method in get_core_methods(file_name, args.test_path):
+            core_method_counter += 1
+            methods_call_java_count += iterate_method_call_count(
+                method.get("method_events", [])
+            )
+        print(core_method_counter,",",methods_call_java_count)
 
 
 def multiline_match(
