@@ -45,11 +45,11 @@ parse_dumps_parallel() {
 
 parse_netty_dumps() {
     cut </ssd/claudios/anand_traces/io_netty_list.txt -f2- |
-        xargs -P4 -I{} sh -c "(poetry run python scripts/trace_parse.py {} --source_path /ssd/claudios/anand_projs/netty/common/src/main/java/ --test_path /ssd/claudios/anand_projs/netty/common/src/test/java/ 2>1 | aha > reports/netty_\$(basename {}).html)"
+        xargs -P4 -I{} sh -c "(poetry run python scripts/trace_parse.py --source_path /ssd/claudios/anand_projs/netty/common/src/main/java/ --test_path /ssd/claudios/anand_projs/netty/common/src/test/java/ {} 2>1 | aha > reports/netty_\$(basename {}).html)"
 }
 
 parse_guava_dumps() {
-    cut </ssd/claudios/anand_traces/com_google_list.txt -f2- | xargs -P8 -I{} sh -c "(poetry run python scripts/trace_parse.py {} --max_depth -1 --source_path /ssd/claudios/anand_projs/guava/guava/src/ --test_path /ssd/claudios/anand_projs/guava/guava-tests/test/ 2>1 | aha > reports/guava_\$(basename {}).html)"
+    cut </ssd/claudios/anand_traces/com_google_list.txt -f2- | xargs -P8 -I{} sh -c "(poetry run python scripts/trace_parse.py --source_path /ssd/claudios/anand_projs/guava/guava/src/ --test_path /ssd/claudios/anand_projs/guava/guava-tests/test/ {} 2>1 | aha > reports/guava_\$(basename {}).html)"
 }
 
 sort_resolved_dumps() {
@@ -181,7 +181,9 @@ generate_project_report() {
     # printf "Test suites heuristic: %d\n" "$files"
     # printf "Test cases heuristic: %d\n" "$test_cases_raw"
     # echo "---------------"
-    printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build"
+
+    core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | xargs -0 -P32 -n1 -I{} python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {} | awk -F',' '{s+=$1;d+=$2} END {print s","d}')
+    printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build" "$core_methods"
 }
 
 find_class_loader_corruptions() {
@@ -198,10 +200,11 @@ backup_dumps()
 case "$1" in
   "projreport")
     echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run,project_built,project_didnt_build"
-    for PROJ in /ssd/claudios/projects/camel-kamelets /ssd/claudios/projects/maven-dist-tool /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/geronimo-metrics /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/incubator-kyuubi /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/spark /ssd/claudios/projects/geronimo-txmanager /ssd/claudios/projects/capella-basic-vp /ssd/claudios/projects/cxf-fediz /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections /ssd/claudios/projects/activemq /ssd/claudios/eugenp_tutorials
+    for PROJ in /ssd/claudios/projects/camel-kamelets /ssd/claudios/projects/maven-dist-tool /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/geronimo-metrics /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/incubator-kyuubi /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/spark /ssd/claudios/projects/geronimo-txmanager /ssd/claudios/projects/capella-basic-vp /ssd/claudios/projects/cxf-fediz /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections /ssd/claudios/projects/activemq /ssd/claudios/projects/eugenp_tutorials
     do
         generate_project_report $PROJ
     done
+    exit 0
     ;;
   *)
     echo "You have failed to specify what to do correctly."
@@ -209,4 +212,4 @@ case "$1" in
     ;;
 esac
 
-parallel --pipe -N1 --null echo {}
+# parallel --pipe -N1 --null echo {}
