@@ -35,7 +35,7 @@ def clean_event(event):
     return event
 
 
-def get_core_methods(path, test_path, index_traces=True):
+def get_core_methods(path, test_path, index_traces=True,silent=False):
     """Generates a stream of core method events from a traced test suite."""
     # Use an expanding set of all method calls starting from a core/test method to track where we are in the call tree.
     # This set is initialized & updated with expected method events as soon as we enter a test case and should be empty
@@ -54,19 +54,22 @@ def get_core_methods(path, test_path, index_traces=True):
     try:
         size = os.path.getsize(heuristic_suite_path)
     except FileNotFoundError:
-        print(suite_name)
-        print(f"{heuristic_suite_path} SUITE NOT FOUND!")
+        if not silent:
+            print(suite_name)
+            print(f"{heuristic_suite_path} SUITE NOT FOUND!")
         # continue
-    print(
-        f"Opening dump of Java test suite {'.'.join(suite_name)} (size: {size}) from {path}:"
-    )
+    if not silent:
+        print(
+            f"Opening dump of Java test suite {'.'.join(suite_name)} (size: {size}) from {path}:"
+        )
     with gzip.open(path, "rt") as f:
         for line in f:
             line_ix += 1
             try:
                 json_line = json.loads(line.rstrip())
             except:
-                print("JSON error? line", line_ix, "of file", path)
+                if not silent:
+                    print("JSON error? line", line_ix, "of file", path)
                 continue
             indexed_traces[json_line["index"]] = {
                 "index": json_line["index"],
@@ -97,7 +100,8 @@ def get_core_methods(path, test_path, index_traces=True):
             "test" in method_name_lower or "when" in method_name_lower
         )  # we could skip junit classes too
         if is_test_case:
-            print("Test case found: ", class_name + "." + method_name)
+            if not silent:
+                print("Test case found: ", class_name + "." + method_name)
         # Skip methods that don't belong to either category of interest.
         if not is_test_case and not fanout:
             # print(f"    Skipping trace {data['index']} of {class_name} : {method_name} as it is a test case (or fanout has not begun)...")
@@ -115,7 +119,8 @@ def get_core_methods(path, test_path, index_traces=True):
             fanout = set(new_method_calls)
         else:
             if data["index"] not in fanout:
-                raise ValueError("Index not found in fan-out!", data["index"])
+                if not silent:
+                    raise ValueError("Index not found in fan-out!", data["index"])
             # Remove the current call and add fan-out based on whether this is a test or core.
             fanout.remove(data["index"])
             fanout.update(new_method_calls)
@@ -392,12 +397,12 @@ if __name__ == "__main__":
 
         core_method_counter = 0
         methods_call_java_count = 0
-        for method in get_core_methods(file_name, args.test_path):
+        for method in get_core_methods(file_name, args.test_path,silent=True):
             core_method_counter += 1
             methods_call_java_count += iterate_method_call_count(
                 method.get("method_events", [])
             )
-        print(core_method_counter,",",methods_call_java_count)
+        print(f"{core_method_counter},{methods_call_java_count}")
 
 
 def multiline_match(
