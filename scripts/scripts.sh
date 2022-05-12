@@ -182,7 +182,7 @@ generate_project_report() {
     # printf "Test cases heuristic: %d\n" "$test_cases_raw"
     # echo "---------------"
 
-    core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | xargs -0 -P32 -n1 -I{} python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {} | awk -F',' '{s+=$1;d+=$2} END {print s","d}')
+    core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | xargs -0 -P32 -n1 -I{} python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {} | awk -F',' 'BEGIN {s=0;d=0} {s+=$1;d+=$2} END {print s","d}')
     printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build" "$core_methods"
 }
 
