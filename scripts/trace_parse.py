@@ -121,9 +121,10 @@ def get_core_methods(path, test_path, index_traces=True,silent=False):
             if data["index"] not in fanout:
                 if not silent:
                     raise ValueError("Index not found in fan-out!", data["index"])
+            else:
             # Remove the current call and add fan-out based on whether this is a test or core.
-            fanout.remove(data["index"])
-            fanout.update(new_method_calls)
+                fanout.remove(data["index"])
+                fanout.update(new_method_calls)
 
         # Yield only non-test methods.
         if (
