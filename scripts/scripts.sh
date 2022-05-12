@@ -154,8 +154,8 @@ generate_project_report() {
 	# printf "Mvn runs: %d\n" "$mvn_ran"
 
     testsuite_run=$(find "$proj/logs_X4PmlaxV" -not -name "log_build.txt" | wc -l)
-    project_built=$(grep -c "BUILD SUCCESS" "$proj/logs_X4PmlaxV/log_build.txt")
-    project_didnt_build=$(grep -c "BUILD FAILURE" "$proj/logs_X4PmlaxV/log_build.txt")
+    project_built=$(grep -c "BUILD SUCCESS" "$proj"/logs_X4PmlaxV/log_build.txt)
+    project_didnt_build=$(grep -c "BUILD FAILURE" "$proj"/logs_X4PmlaxV/log_build.txt)
 	# printf "Testsuite runs: %d\n" "$testsuite_run"
 
     build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
