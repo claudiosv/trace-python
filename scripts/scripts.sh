@@ -26,7 +26,7 @@ find_instrumented_dumps_and_parse() {
         sed -E "s/mvn_log_.*$/\*\_java.gz/" |
         sort -u |
         xargs -I% -n1 sh -c 'ls -Sr % 2>>/home/claudios/unresolved_202205111816.txt' |
-        parallel --progress -N1 -j32 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt) 2>parse_logs/\$(basename {})_errors.log" >>healthcheck.log
+        parallel --progress --bar --eta -N1 -j8 "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py parse {} > parse_logs/\$(basename {}).txt) 2>parse_logs/\$(basename {})_errors.log" >>healthcheck.log
 }
 
 parse_dumps() {
@@ -37,10 +37,12 @@ parse_dumps() {
 }
 
 parse_dumps_parallel() {
-    find /ssd/claudios/projects -name "*java.gz" -size +33c -printf '%s\t%p\n' |
-        sort -nr |
-        cut -f2- |
-        parallel --progress -N1 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt)" 2>parse_logs_errors1.log
+    find /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/org.aspectj -name "*java.gz" -size +33c -print0 |
+    parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py parquet {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
+    # find "$1" -name "*java.gz" -size +33c -printf '%s\t%p\n' |
+    #     sort -nr |
+    #     cut -f2- |
+    #     parallel --progress --bar --eta -N1 --null "python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt 2>>parse_logs_errors2.log"
 }
 
 parse_netty_dumps() {
@@ -182,7 +184,7 @@ generate_project_report() {
     # printf "Test cases heuristic: %d\n" "$test_cases_raw"
     # echo "---------------"
 
-    core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | parallel --progress --bar --eta -j32 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {})" | awk -F',' 'BEGIN {s=0;d=0} {s+=$1;d+=$2} END {print s","d}')
+    core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {})" | awk -F',' 'BEGIN {s=0;d=0} {s+=$1;d+=$2} END {print s","d}')
     printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build" "$core_methods" >> projreport.csv
 }
 
@@ -197,6 +199,20 @@ backup_dumps()
     sudo find /ssd/claudios/projects -name "*java.gz" -type f -exec sh -c 'mv $(dirname {})/dump-1.zip /data/claudios/dump_backups/$(dirname {})/dump-1.zip' \;
 }
 
+parse_dumps_parallel() {
+    find /ssd/claudios/projects/commons-io /ssd/claudios/projects/commons-lang -name "*java.gz" -size +33c -print0 |
+    parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py parquet {} >
+ parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
+    # find "$1" -name "*java.gz" -size +33c -printf '%s\t%p\n' |
+    #     sort -nr |
+    #     cut -f2- |
+    #     parallel --progress --bar --eta -N1 --null "python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt 2>>parse_logs_errors2.log"
+}
+
+parse_dumps_parallel
+exit 0
+
+
 case "$1" in
   "projreport")
     echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run,project_built,project_didnt_build" >> projreport.csv
@@ -206,6 +222,13 @@ case "$1" in
     done
     exit 0
     ;;
+  "parse")
+#   for PROJ in /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/org.aspectj
+#   do
+    # echo
+#   done
+  exit 0
+  ;;
   *)
     echo "You have failed to specify what to do correctly."
     exit 1
