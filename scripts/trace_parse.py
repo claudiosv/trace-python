@@ -17,7 +17,7 @@ from typing import List, Tuple
 indexed_traces = {}  # dump: []
 
 heuristic_suite_path = ""
-
+test_case_names = set() 
 
 def clean_event(event):
     if isinstance(event, int):
@@ -97,7 +97,7 @@ def get_core_methods(path, test_path, index_traces=True,silent=False):
         #    print(f"jUnit class detected in: {path} method: {class_name}.{method_name}")
 
         is_test_case = is_test_class and (
-            "test" in method_name_lower or "when" in method_name_lower
+            "test" in method_name_lower or "when" in method_name_lower or method_name in test_case_names
         )  # we could skip junit classes too
         if is_test_case:
             if not silent:
@@ -222,7 +222,9 @@ if __name__ == "__main__":
     parser.add_argument("--max_depth", type=int)
     parser.add_argument("action", type=str)
     parser.add_argument("path", metavar="Path", type=Path)
-
+    with open("interesting_names.txt") as f:
+            mylist = f.read().splitlines() 
+            test_case_names = set(mylist)
     args = parser.parse_args()
 
     if args.action == "parquet":

@@ -182,7 +182,7 @@ generate_project_report() {
     # printf "Test cases heuristic: %d\n" "$test_cases_raw"
     # echo "---------------"
 
-    core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | parallel --progress --bar --eta -j32 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {})" | awk -F',' 'BEGIN {s=0;d=0} {s+=$1;d+=$2} END {print s","d}')
+    core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | parallel --progress --bar --eta -j8 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {})" | awk -F',' 'BEGIN {s=0;d=0} {s+=$1;d+=$2} END {print s","d}')
     printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build" "$core_methods" >> projreport.csv
 }
 
@@ -197,10 +197,23 @@ backup_dumps()
     sudo find /ssd/claudios/projects -name "*java.gz" -type f -exec sh -c 'mv $(dirname {})/dump-1.zip /data/claudios/dump_backups/$(dirname {})/dump-1.zip' \;
 }
 
+parse_dumps_parallel() {
+    find /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/org.aspectj -name "*java.gz" -size +33c -print0 |
+    parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py parquet {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
+    # find "$1" -name "*java.gz" -size +33c -printf '%s\t%p\n' |
+    #     sort -nr |
+    #     cut -f2- |
+    #     parallel --progress --bar --eta -N1 --null "python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt 2>>parse_logs_errors2.log"
+}
+
+parse_dumps_parallel
+exit 0
+
 case "$1" in
   "projreport")
+	  #/ssd/claudios/projects/camel-kamelets /ssd/claudios/projects/maven-dist-tool /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/geronimo-metrics /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/incubator-kyuubi /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/spark /ssd/claudios/projects/geronimo-txmanager /ssd/claudios/projects/capella-basic-vp /ssd/claudios/projects/cxf-fediz /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj 
     echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run,project_built,project_didnt_build" >> projreport.csv
-    for PROJ in /ssd/claudios/projects/camel-kamelets /ssd/claudios/projects/maven-dist-tool /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/geronimo-metrics /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/incubator-kyuubi /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/spark /ssd/claudios/projects/geronimo-txmanager /ssd/claudios/projects/capella-basic-vp /ssd/claudios/projects/cxf-fediz /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections /ssd/claudios/projects/activemq /ssd/claudios/projects/eugenp_tutorials
+    for PROJ in /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections /ssd/claudios/projects/activemq /ssd/claudios/projects/eugenp_tutorials
     do
         generate_project_report $PROJ
     done
