@@ -1,8 +1,9 @@
 import argparse
 import gzip
 import json
+from operator import index
 
-# import orjson as json
+import orjson as json
 
 # import glob
 import os
@@ -35,7 +36,7 @@ def clean_event(event):
     return event
 
 
-def get_core_methods(path, test_path, index_traces=True,silent=False):
+def get_core_methods(path, test_path, index_traces=True, silent=False):
     """Generates a stream of core method events from a traced test suite."""
     # Use an expanding set of all method calls starting from a core/test method to track where we are in the call tree.
     # This set is initialized & updated with expected method events as soon as we enter a test case and should be empty
@@ -122,7 +123,7 @@ def get_core_methods(path, test_path, index_traces=True,silent=False):
                 if not silent:
                     raise ValueError("Index not found in fan-out!", data["index"])
             else:
-            # Remove the current call and add fan-out based on whether this is a test or core.
+                # Remove the current call and add fan-out based on whether this is a test or core.
                 fanout.remove(data["index"])
                 fanout.update(new_method_calls)
 
@@ -160,21 +161,59 @@ def method_entry_to_debug_str(
     return method_repr
 
 
-def iterate_method_calls(method_events: dict) -> Tuple[str, int]:
-    event_max = 200
-    event_cnt = 0
+def traverse_call_graph(
+    trace: dict, depth: int, max_depth: int, call_counter
+) -> Tuple[int, str, int]:
+    if depth > max_depth and not max_depth == -1:
+        return (depth, "", 0)
+    depth += 1
+    event_max = 512
     java_calls = ""
-    call_counter = 0
-    for event in method_events:
+    # call_counter = 0
+    """
+    calls = "eventblah eventblah kasjdk kasjdk bleh"
+    This method should accept a list of method events like [
+        "eventblah",
+        "kasjdk",
+        1,
+        "kasjdk",
+        5,
+        6,
+        7
+        "bleh"
+    ]
+
+    It should add the Java calls to a string. This means it must be able to recurse
+    on the the event indexes (1,5,6,7). These recursions should not in the end produce
+    strings with more than 512 java calls. So if 1 and 5 produce a total of 511, 6 should
+    not be traversed. If 5 reaches 512, it should exit, regardless of how deep
+    with 512 calls.
+    """
+    event_cnt = 0
+    for event in trace["method_events"]:
+        # print(event)
         if type(event) is int:
+            # print("entered index event", event)
+            if event in indexed_traces:
+                # print(event)
+                depth, java_calls_child, call_counter_child = traverse_call_graph(
+                    indexed_traces[event], depth, max_depth, call_counter
+                )
+                call_counter += call_counter_child
+                java_calls += java_calls_child
+                # print(java_calls)
+            # else:
+            # print("event not in index")
+            # print(indexed_tracess)
             continue
-        if event_cnt > event_max:
+        if call_counter > event_max:
             break
         event_cnt += 1
         e_k = event["event_kind"]
         if e_k == "method_call":
             called_class_name = event.get("called_class_name", "Unknown")
             called_method_name = event.get("called_method_name", "Unknown")
+            # print("entered method call", called_class_name)
 
             if called_class_name.startswith("java."):
                 method_call_repr = method_call_to_debug_str(
@@ -184,11 +223,13 @@ def iterate_method_calls(method_events: dict) -> Tuple[str, int]:
                     event.get("return_type", "void"),
                 )
                 java_calls += method_call_repr
+                # print(java_calls)
                 call_counter += 1
-    return (java_calls, call_counter)
+    return (depth, java_calls, call_counter)
+
 
 def iterate_method_call_count(method_events: dict) -> int:
-    event_max = 200
+    event_max = 999999999999
     event_cnt = 0
     for event in method_events:
         if type(event) is int:
@@ -203,6 +244,7 @@ def iterate_method_call_count(method_events: dict) -> int:
                 return 1
     return 0
 
+
 def count_java_calls(call_counter: Counter) -> int:
     total = 0
     for call, count in call_counter.items():
@@ -215,6 +257,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process a gzipped trace.")
     parser.add_argument("--source_path", metavar="Path", type=Path, required=False)
     parser.add_argument("--test_path", metavar="Path", type=Path, required=False)
+    parser.add_argument("--project_name", metavar="Path", type=Path, required=False)
+    parser.add_argument("--out_path", metavar="Path", type=Path, required=False)
     parser.add_argument(
         "--show_source", type=bool, action=argparse.BooleanOptionalAction
     )
@@ -225,9 +269,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.action == "parquet":
+    if args.action == "parse":
         dumps = {}
         dump_counter = {}
+        project_name = args.project_name
+        out_path = args.out_path
         file_name = Path(args.path)
         file_stem = file_name.stem
         if os.path.getsize(file_name) < 1:
@@ -249,15 +295,17 @@ if __name__ == "__main__":
             just_method_name = method_name.partition("$")[0]
             anonymous_classes = class_name.split("$")[1:]
             anonymous_methods = method_name.split("$")[1:]
-            java_calls, java_call_count = iterate_method_calls(
-                method.get("method_events", [])
+            max_depth, java_calls, java_call_count = traverse_call_graph(
+                method, 0, args.max_depth, 0
             )
 
             if args.verbose:
                 print(
                     f"    Analyzing trace {method['index']} FQN: {class_name} : {method_name}"
                 )
-                print(f"        Method makes {java_call_count} calls to java:{java_calls}")
+                print(
+                    f"        Method makes {java_call_count} calls to java:{java_calls}"
+                )
 
             if args.source_path:
                 search_root = args.source_path
@@ -277,6 +325,8 @@ if __name__ == "__main__":
                 # continue
 
             method_dict_template = {
+                "project": project_name,
+                "dump_path": str(file_name),
                 "test_suite": file_stem,  # this is the dump name
                 "index_in_dump": method["index"],
                 "class_name": class_name,
@@ -294,6 +344,7 @@ if __name__ == "__main__":
                 "java_call_count": java_call_count,
                 "heuristic_source_path": str(heuristic_path),
                 "heuristic_suite_path": str(heuristic_suite_path),
+                "max_depth": max_depth
             }
 
             for event in method["method_events"]:
@@ -304,7 +355,9 @@ if __name__ == "__main__":
                         if len(line_numbers) > 0:
                             distance = max(line_numbers) - min(line_numbers)
                             extended_line_numbers = list(map(str, line_numbers))
-                            line_regex = "|".join(extended_line_numbers)  # str(None) "None"
+                            line_regex = "|".join(
+                                extended_line_numbers
+                            )  # str(None) "None"
                             method_dict_template["loc"] = tuple(line_numbers)
                             method_dict_template["loc_executed"] = len(line_numbers)
                             method_dict_template["loc_span"] = distance + 1
@@ -379,14 +432,18 @@ if __name__ == "__main__":
             df["source_code"] = df["source_code"].astype(pd.StringDtype())
             df["notes"] = df["notes"].astype(pd.StringDtype())
             df["java_calls"] = df["java_calls"].astype(pd.StringDtype())
-            df["heuristic_source_path"] = df["heuristic_source_path"].astype(pd.StringDtype())
-            df["heuristic_suite_path"] = df["heuristic_suite_path"].astype(pd.StringDtype())
+            df["heuristic_source_path"] = df["heuristic_source_path"].astype(
+                pd.StringDtype()
+            )
+            df["heuristic_suite_path"] = df["heuristic_suite_path"].astype(
+                pd.StringDtype()
+            )
             print(df.info())
             print(df.dtypes)
             print(df.info(memory_usage="deep"))
-            os.makedirs("parquets", exist_ok=True)
+            os.makedirs(out_path, exist_ok=True)
             # df.to_parquet(f"parquets/{file_stem}.parquet", engine='pyarrow')
-            df.to_pickle(f"parquets/{file_stem}.gz")
+            df.to_pickle(out_path / f"{file_stem}.gz")
         else:
             print("Warning: Not a single core method was encountered")
     elif args.action == "count":
@@ -398,7 +455,7 @@ if __name__ == "__main__":
 
         core_method_counter = 0
         methods_call_java_count = 0
-        for method in get_core_methods(file_name, args.test_path,silent=True):
+        for method in get_core_methods(file_name, args.test_path, silent=True):
             core_method_counter += 1
             methods_call_java_count += iterate_method_call_count(
                 method.get("method_events", [])
