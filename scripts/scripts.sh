@@ -38,7 +38,7 @@ parse_dumps() {
 
 parse_dumps_parallel() {
     find /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/org.aspectj -name "*java.gz" -size +33c -print0 |
-    parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py parquet {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
+        parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py parquet {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
     # find "$1" -name "*java.gz" -size +33c -printf '%s\t%p\n' |
     #     sort -nr |
     #     cut -f2- |
@@ -144,39 +144,39 @@ generate_project_report() {
     basename=$(basename "$proj")
     # echo "$basename"
     failed_txt=$(find "$proj" -name FAILED.txt | wc -l)
-	# printf "FAILED.txt: %d\n" "$failed_txt"
+    # printf "FAILED.txt: %d\n" "$failed_txt"
 
     build_fail=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD FAILURE" {} | wc -l)
-	# printf "Build failure: %d\n" "$build_fail"
+    # printf "Build failure: %d\n" "$build_fail"
 
     build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
-	# printf "Build success: %d\n" "$build_success"
+    # printf "Build success: %d\n" "$build_success"
 
     mvn_ran=$(find "$proj" -name "mvn_*" | wc -l)
-	# printf "Mvn runs: %d\n" "$mvn_ran"
+    # printf "Mvn runs: %d\n" "$mvn_ran"
 
     testsuite_run=$(find "$proj/logs_X4PmlaxV" -not -name "log_build.txt" | wc -l)
     project_built=$(grep "BUILD SUCCESS" "$proj"/logs_X4PmlaxV/mvn_log_build_*.txt | wc -l)
     project_didnt_build=$(grep "BUILD FAILURE" "$proj"/logs_X4PmlaxV/mvn_log_build_*.txt | wc -l)
-	# printf "Testsuite runs: %d\n" "$testsuite_run"
+    # printf "Testsuite runs: %d\n" "$testsuite_run"
 
     build_success=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H "BUILD SUCCESS" {} | wc -l)
-	# printf "Build success: %d\n" "$build_success"
+    # printf "Build success: %d\n" "$build_success"
 
     tests_run=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | wc -l)
-	# printf "Tests run: %d\n" "$tests_run"
+    # printf "Tests run: %d\n" "$tests_run"
 
     test_sum=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} pcre2grep -o1 "Tests run: ([1-9]+), Failures: 0, Errors: 0, Skipped: 0" {} | awk '{s+=$1} END {print s}')
-	# printf "Tests run sum: %d\n" "$test_sum"
+    # printf "Tests run sum: %d\n" "$test_sum"
 
     instrumented=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i "Enabling instrumentation" {} | wc -l)
-	# printf "Enabling instrumentation: %d\n" "$instrumented"
+    # printf "Enabling instrumentation: %d\n" "$instrumented"
 
     test_instrumented=$(find "$proj" -name "mvn_*" -print0 | xargs -0 -P8 -I{} grep -H -P -i -m1 "Instrumenting: .*Test$" {} | wc -l)
-	# printf "Test instrumented: %d\n" "$test_instrumented"
+    # printf "Test instrumented: %d\n" "$test_instrumented"
 
     gzips=$(find "$proj" -name "*java.gz" | wc -l)
-	# printf "Gzips produced: %d\n" "$gzips"
+    # printf "Gzips produced: %d\n" "$gzips"
 
     files=$(find "$proj" -iname "*test*.java" -type f | wc -l)
     test_cases_raw=$(find "$proj" -iname "*test*.java" -type f -print0 | xargs -0 -I% grep -i -o @Test "%" | sort | uniq -c | sort -nr | awk '{s+=$1} END {print s}')
@@ -185,7 +185,7 @@ generate_project_report() {
     # echo "---------------"
 
     core_methods=$(find "$proj" -name "*java.gz" -size +33c -print0 | parallel --progress --bar --eta -j8 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py count {})" | awk -F',' 'BEGIN {s=0;d=0} {s+=$1;d+=$2} END {print s","d}')
-    printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build" "$core_methods" >> projreport.csv
+    printf "%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s\n" "$basename" "$failed_txt" "$build_fail" "$build_success" "$tests_run" "$test_sum" "$instrumented" "$test_instrumented" "$gzips" "$files" "$test_cases_raw" "$mvn_ran" "$testsuite_run" "$project_built" "$project_didnt_build" "$core_methods" >>projreport.csv
 }
 
 find_class_loader_corruptions() {
@@ -194,41 +194,36 @@ find_class_loader_corruptions() {
     pcre2grep -M -r "Considering: (?<class>(\w|$|/)*) (?<type>\w*)\nInstrumenting: \k<class>\nConsidering: \k<class>\\\$1 (?!\k<type>)" .
 }
 
-backup_dumps()
-{
+backup_dumps() {
     sudo find /ssd/claudios/projects -name "*java.gz" -type f -exec sh -c 'mv $(dirname {})/dump-1.zip /data/claudios/dump_backups/$(dirname {})/dump-1.zip' \;
 }
 
 parse_dumps_parallel() {
-    find /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/org.aspectj -name "*java.gz" -size +33c -print0 |
-    parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py parquet {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
-    # find "$1" -name "*java.gz" -size +33c -printf '%s\t%p\n' |
-    #     sort -nr |
-    #     cut -f2- |
-    #     parallel --progress --bar --eta -N1 --null "python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py {} > parse_logs/\$(basename {}).txt 2>>parse_logs_errors2.log"
+    proj="$1"
+    out_path="$2"
+    max_depth="$3"
+    find "$proj" -name "*java.gz" -size +33c -print0 |
+        parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py --max_depth $max_depth --out_path $out_path --project_name \$(basename $proj) parse {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
 }
 
-parse_dumps_parallel
-exit 0
-
 case "$1" in
-  "projreport")
-	  #/ssd/claudios/projects/camel-kamelets /ssd/claudios/projects/maven-dist-tool /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/geronimo-metrics /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/incubator-kyuubi /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/spark /ssd/claudios/projects/geronimo-txmanager /ssd/claudios/projects/capella-basic-vp /ssd/claudios/projects/cxf-fediz /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj
-    echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run,project_built,project_didnt_build" >> projreport.csv
-    for PROJ in /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections /ssd/claudios/projects/activemq /ssd/claudios/projects/eugenp_tutorials
-    do
+"projreport")
+    #/ssd/claudios/projects/camel-kamelets /ssd/claudios/projects/maven-dist-tool /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/geronimo-metrics /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/incubator-kyuubi /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/spark /ssd/claudios/projects/geronimo-txmanager /ssd/claudios/projects/capella-basic-vp /ssd/claudios/projects/cxf-fediz /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/claudios/projects/openzipkin_zipkin /ssd/claudios/projects/commons-lang /ssd/claudios/projects/commons-io /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/avro /ssd/claudios/projects/dirigible /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/dubbo /ssd/claudios/projects/rdf4j /ssd/claudios/projects/netty /ssd/claudios/projects/org.aspectj
+    echo "basename,failed_txt,build_fail,build_success,tests_run,test_sum,instrumented,test_instrumented,gzips,files,test_cases_raw,mvn_ran,testsuite_run,project_built,project_didnt_build" >>projreport.csv
+    for PROJ in /ssd/claudios/projects/jetty.project /ssd/claudios/projects/eclipse-collections /ssd/claudios/projects/activemq /ssd/claudios/projects/eugenp_tutorials; do
         generate_project_report $PROJ
     done
     exit 0
     ;;
-  "parse")
-#   for PROJ in /ssd/claudios/projects/geronimo-opentracing /ssd/claudios/projects/oneofour /ssd/claudios/projects/geronimo-config /ssd/claudios/projects/packager /ssd/claudios/projects/dash-licenses /ssd/claudios/projects/empire-db /ssd/claudios/projects/microprofile-graphql /ssd/claudios/projects/servicecomb-pack /ssd/claudios/projects/lyo /ssd/claudios/projects/lemminx /ssd/claudios/projects/winery /ssd/claudios/projects/californium /ssd/claudios/projects/jnosql /ssd/claudios/projects/hono /ssd/claudios/projects/pinot /ssd/claudios/projects/org.aspectj
-#   do
-    # echo
-#   done
-  exit 0
-  ;;
-  *)
+"parse")
+    out_path="$2"
+    max_depth="$3"
+    for PROJ in /ssd/claudios/projects/*; do
+        parse_dumps_parallel "$PROJ" "$out_path" "$max_depth"
+    done
+    exit 0
+    ;;
+*)
     echo "You have failed to specify what to do correctly."
     exit 1
     ;;
