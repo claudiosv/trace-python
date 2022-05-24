@@ -203,7 +203,7 @@ parse_dumps_parallel() {
     out_path="$2"
     max_depth="$3"
     find "$proj" -name "*java.gz" -size +33c -print0 |
-        parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py --max_depth $max_depth --out_path $out_path --project_name \$(basename $proj) parse {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
+        parallel --progress --bar --eta -N1 -j16 --null "(timeout -v 24h python3.9 /ssd/claudios/trace-python/scripts/trace_parse.py --max_depth $max_depth --out_path $out_path --project_name \$(echo {} | cut -d "/" -f5) parse {} > parse_logs/\$(basename {}).stdout 2>parse_logs/\$(basename {}).stderr)"
 }
 
 case "$1" in
@@ -218,9 +218,11 @@ case "$1" in
 "parse")
     out_path="$2"
     max_depth="$3"
-    for PROJ in /ssd/claudios/projects/*; do
-        parse_dumps_parallel "$PROJ" "$out_path" "$max_depth"
-    done
+    # for PROJ in /ssd/claudios/projects/*; do
+        # printf "Starting project: %s\n" "$(basename "$PROJ")"
+    parse_dumps_parallel /ssd/claudios/projects/ "$out_path" "$max_depth"
+        # printf "Finished project: %s\n" "$(basename "$PROJ")"
+    # done
     exit 0
     ;;
 *)

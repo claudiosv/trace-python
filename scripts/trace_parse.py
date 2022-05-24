@@ -18,7 +18,7 @@ from typing import List, Tuple
 indexed_traces = {}  # dump: []
 
 heuristic_suite_path = ""
-test_case_names = set() 
+test_case_names = set()
 
 def clean_event(event):
     if isinstance(event, int):
@@ -162,14 +162,14 @@ def method_entry_to_debug_str(
 
 
 def traverse_call_graph(
-    trace: dict, depth: int, max_depth: int, call_counter
+    trace: dict, depth: int, max_depth: int, call_counter, all_traces=indexed_traces
 ) -> Tuple[int, str, int]:
     if depth > max_depth and not max_depth == -1:
         return (depth, "", 0)
     depth += 1
     event_max = 512
     java_calls = ""
-    # call_counter = 0
+    call_counter = 0
     """
     calls = "eventblah eventblah kasjdk kasjdk bleh"
     This method should accept a list of method events like [
@@ -194,10 +194,10 @@ def traverse_call_graph(
         # print(event)
         if type(event) is int:
             # print("entered index event", event)
-            if event in indexed_traces:
+            if event in all_traces:
                 # print(event)
                 depth, java_calls_child, call_counter_child = traverse_call_graph(
-                    indexed_traces[event], depth, max_depth, call_counter
+                    all_traces[event], depth, max_depth, call_counter
                 )
                 call_counter += call_counter_child
                 java_calls += java_calls_child
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     parser.add_argument("action", type=str)
     parser.add_argument("path", metavar="Path", type=Path)
     with open("interesting_names.txt") as f:
-            mylist = f.read().splitlines() 
+            mylist = f.read().splitlines()
             test_case_names = set(mylist)
     args = parser.parse_args()
 
